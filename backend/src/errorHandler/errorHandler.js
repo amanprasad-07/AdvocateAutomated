@@ -6,14 +6,14 @@
  * a consistent JSON response to the client.
  */
 
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = (error, req, res, next) => {
     // Default to 500 if status code is not explicitly set
-    const statusCode = err.statusCode || 500;
+    const statusCode = error?.statusCode || 500;
 
     // Use provided error message or fallback message
-    const message = err.message || "Something went wrong. Please try again later";
+    const message = error?.message || "Something went wrong. Please try again later";
 
-    console.error("Error:", err.stack || err.message);
+    console.error("Error:", error?.stack || message);
     
     res.status(statusCode).json({
         success: false,
