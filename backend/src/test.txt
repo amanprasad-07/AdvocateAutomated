@@ -7,3 +7,26 @@
   "passwordConfirm": "password123",
   "role": "advocate"
 }
+
+
+import crypto from "crypto";
+
+const orderId = "order_RwBdpjWZEQLEeY";
+const paymentId = "pay_test_002";
+const secret = "eExXN3SjXl64ZfmH5nD9ZjHD";
+
+const body = orderId + "|" + paymentId;
+
+const signature = crypto
+  .createHmac("sha256", secret)
+  .update(body)
+  .digest("hex");
+
+console.log(signature);
+{
+  "razorpay_order_id": "order_RwBdpjWZEQLEeY",
+  "razorpay_payment_id": "pay_test_002",
+  "razorpay_signature": "ef8035cea1055792c58c33fb1eb6e42e30c20ae5ddde194598b6af5d94bf41c7",
+  "caseId": "694d670ccd5e245e0aad0f77",
+  "amount": 15000
+}

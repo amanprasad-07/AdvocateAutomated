@@ -3,10 +3,13 @@ import Case from "../model/case.js";
 
 /**
  * Upload evidence metadata
- * Advocate / Junior Advocate
+ *
+ * Accessible to Advocate / Junior Advocate roles
+ * Handles validation, access control, and evidence creation
  */
 export const uploadEvidence = async (req, res, next) => {
     try {
+        // Extract evidence metadata from request body
         const {
             title,
             description,
@@ -19,12 +22,14 @@ export const uploadEvidence = async (req, res, next) => {
             isConfidential = false
         } = req.body;
 
+        // Validate presence of required fields
         if (!title || !fileUrl || !fileType || !mimeType || !fileSize || !caseId) {
             const err = new Error("Missing required fields");
             err.statusCode = 400;
             return next(err);
         }
 
+        // Verify that the referenced case exists
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             const err = new Error("Case not found");
@@ -32,7 +37,11 @@ export const uploadEvidence = async (req, res, next) => {
             return next(err);
         }
 
-        // Advocate or assigned junior only
+        /**
+         * Access control:
+         * - Primary advocate of the case
+         * - Or a junior advocate assigned to the case
+         */
         const isAdvocate =
             existingCase.advocate.toString() === req.user._id.toString();
 
@@ -47,6 +56,7 @@ export const uploadEvidence = async (req, res, next) => {
             return next(err);
         }
 
+        // Create evidence record
         const evidence = await Evidence.create({
             title,
             description,
@@ -60,6 +70,7 @@ export const uploadEvidence = async (req, res, next) => {
             isConfidential
         });
 
+        // Send successful upload response
         res.status(201).json({
             success: true,
             message: "Evidence uploaded successfully",
@@ -67,18 +78,28 @@ export const uploadEvidence = async (req, res, next) => {
         });
 
     } catch (error) {
+        // Forward unexpected errors to centralized error handler
         next(error);
     }
 };
 
 /**
  * Get evidence (role-based)
+ *
+ * - Clients: non-confidential evidence for their own cases
+ * - Advocates: all evidence for cases they handle
+ * - Junior advocates: evidence for cases assigned to them
+ * - Admins: unrestricted audit access
  */
 export const getEvidence = async (req, res, next) => {
     try {
         let filter = {};
 
-        // CLIENT: only own cases, non-confidential
+        /**
+         * CLIENT ACCESS
+         * Clients can view only non-confidential evidence
+         * related to their own cases
+         */
         if (req.user.role === "client") {
             const clientCases = await Case.find({
                 client: req.user._id
@@ -88,7 +109,10 @@ export const getEvidence = async (req, res, next) => {
             filter.isConfidential = false;
         }
 
-        // ADVOCATE: cases they handle
+        /**
+         * ADVOCATE ACCESS
+         * Advocates can view all evidence for cases they manage
+         */
         if (req.user.role === "advocate") {
             const advocateCases = await Case.find({
                 advocate: req.user._id
@@ -97,7 +121,10 @@ export const getEvidence = async (req, res, next) => {
             filter.case = { $in: advocateCases.map(c => c._id) };
         }
 
-        // JUNIOR ADVOCATE: cases assigned to them
+        /**
+         * JUNIOR ADVOCATE ACCESS
+         * Junior advocates can view evidence for assigned cases
+         */
         if (req.user.role === "junior_advocate") {
             const assignedCases = await Case.find({
                 assignedJuniors: req.user._id
@@ -106,13 +133,16 @@ export const getEvidence = async (req, res, next) => {
             filter.case = { $in: assignedCases.map(c => c._id) };
         }
 
-        // ADMIN: no filter (audit access)
+        // ADMIN ACCESS
+        // No filter applied — full audit visibility
 
+        // Fetch evidence with populated relational data
         const evidenceList = await Evidence.find(filter)
             .populate("uploadedBy", "name email role")
             .populate("case", "caseNumber title")
             .sort({ createdAt: -1 });
 
+        // Send response with evidence list
         res.status(200).json({
             success: true,
             count: evidenceList.length,
@@ -120,6 +150,7 @@ export const getEvidence = async (req, res, next) => {
         });
 
     } catch (error) {
+        // Forward errors to centralized error handler
         next(error);
     }
 };

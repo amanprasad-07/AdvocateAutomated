@@ -8,7 +8,19 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 
 const taskRouter = express.Router();
 
-// Assign task
+/**
+ * Task routes
+ *
+ * Handles task assignment, retrieval, and status updates
+ * with strict role-based access control.
+ */
+
+/**
+ * POST /
+ *
+ * Assign a new task to a junior advocate.
+ * Accessible only to advocates.
+ */
 taskRouter.post(
     "/",
     protect,
@@ -16,7 +28,13 @@ taskRouter.post(
     createTask
 );
 
-// View tasks
+/**
+ * GET /
+ *
+ * Retrieve tasks based on user role:
+ * - Advocates: tasks they assigned
+ * - Junior advocates: tasks assigned to them
+ */
 taskRouter.get(
     "/",
     protect,
@@ -24,7 +42,12 @@ taskRouter.get(
     getTasks
 );
 
-// Update task status
+/**
+ * PATCH /:taskId/status
+ *
+ * Update task progress status.
+ * Accessible only to the assigned junior advocate.
+ */
 taskRouter.patch(
     "/:taskId/status",
     protect,
@@ -32,4 +55,5 @@ taskRouter.patch(
     updateTaskStatus
 );
 
+// Export task router for mounting under /api/tasks (or similar)
 export default taskRouter;

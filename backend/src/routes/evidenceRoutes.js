@@ -7,7 +7,19 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 
 const evidenceRouter = express.Router();
 
-// Upload evidence
+/**
+ * Evidence routes
+ *
+ * Handles uploading and viewing of evidence
+ * with strict role-based access control.
+ */
+
+/**
+ * POST /
+ *
+ * Upload evidence metadata.
+ * Accessible to advocates and junior advocates only.
+ */
 evidenceRouter.post(
     "/",
     protect,
@@ -15,7 +27,14 @@ evidenceRouter.post(
     uploadEvidence
 );
 
-// View evidence
+/**
+ * GET /
+ *
+ * Retrieve evidence based on user role:
+ * - Advocates / junior advocates: related case evidence
+ * - Clients: non-confidential evidence for their cases
+ * - Admins: full audit access
+ */
 evidenceRouter.get(
     "/",
     protect,
@@ -23,4 +42,5 @@ evidenceRouter.get(
     getEvidence
 );
 
+// Export evidence router for mounting under /api/evidence (or similar)
 export default evidenceRouter;
