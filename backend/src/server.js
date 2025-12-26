@@ -22,11 +22,11 @@ import juniorRouter from './routes/juniorRoutes.js';
  *
  * Responsible for:
  * - Loading environment variables
- * - Initializing Express application
- * - Registering middleware
- * - Mounting API routes
- * - Connecting to database
- * - Starting HTTP server
+ * - Initializing the Express application
+ * - Registering global middleware
+ * - Mounting all API routes
+ * - Connecting to the database
+ * - Starting the HTTP server
  */
 
 // Load environment variables before accessing process.env
@@ -39,22 +39,25 @@ const app = express();
  */
 
 // Parse incoming JSON request bodies
+// Enables Express to read req.body for JSON payloads
 app.use(express.json());
 
-// Enable CORS with credentials support for frontend integration
+// Enable CORS with credentials support
+// Required for cookie-based authentication with frontend
 app.use(cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true
 }));
 
-// Parse cookies (required for JWT stored in HTTP-only cookies)
+// Parse cookies from incoming requests
+// Required for JWT stored in HTTP-only cookies
 app.use(cookieParser());
 
 /**
  * Route mounting
  *
- * Each router is responsible for a specific domain
- * and enforces its own authorization rules.
+ * Each router encapsulates a specific domain
+ * and enforces its own authentication and authorization logic.
  */
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
@@ -66,11 +69,20 @@ app.use("/api/payments", paymentRouter);
 app.use("/api/appointments", appointmentRouter);
 app.use("/api/client", clientRouter);
 app.use("/api/junior", juniorRouter);
+
+/**
+ * Static file serving
+ *
+ * Exposes uploaded files for controlled access.
+ * Typically used for serving evidence files uploaded via Multer.
+ */
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /**
  * Centralized error-handling middleware
+ *
  * Must be registered AFTER all routes
+ * to properly capture propagated errors.
  */
 app.use(errorHandler);
 
