@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from "cookie-parser";
+import path from 'path';
 
 import { connectDb } from './config/db.js';
 import { errorHandler } from './errorHandler/errorHandler.js';
@@ -12,6 +13,9 @@ import caseRouter from './routes/caseRoutes.js';
 import taskRouter from './routes/taskRoutes.js';
 import evidenceRouter from './routes/evidenceRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
+import appointmentRouter from './routes/appointmentRoutes.js';
+import clientRouter from './routes/clientRoutes.js';
+import juniorRouter from './routes/juniorRoutes.js';
 
 /**
  * Application entry point
@@ -59,6 +63,10 @@ app.use("/api/cases", caseRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/evidence", evidenceRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/appointments", appointmentRouter);
+app.use("/api/client", clientRouter);
+app.use("/api/junior", juniorRouter);
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /**
  * Centralized error-handling middleware

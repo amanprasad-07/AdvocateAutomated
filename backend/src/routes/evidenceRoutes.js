@@ -4,6 +4,7 @@ import {
     getEvidence
 } from "../controller/evidenceController.js";
 import { protect, requireRole } from "../middleware/authMiddleware.js";
+import upload from "../config/multer.js";
 
 const evidenceRouter = express.Router();
 
@@ -24,6 +25,7 @@ evidenceRouter.post(
     "/",
     protect,
     requireRole("advocate", "junior_advocate"),
+    upload.single("file"),   // 🔑 THIS IS THE KEY
     uploadEvidence
 );
 

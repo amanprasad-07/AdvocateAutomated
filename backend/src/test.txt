@@ -30,3 +30,11 @@ console.log(signature);
   "caseId": "694d670ccd5e245e0aad0f77",
   "amount": 15000
 }
+
+
+{
+  "advocateId": "694bce849ce621dd6053276f",
+  "date": "2025-01-05",
+  "timeSlot": "10:00 - 10:30",
+  "purpose": "Legal consultation regarding property dispute"
+}

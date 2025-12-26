@@ -7,29 +7,20 @@ import Case from "../model/case.js";
  * Accessible to Advocate / Junior Advocate roles
  * Handles validation, access control, and evidence creation
  */
+/**
+ * Upload Evidence
+ * Advocate / Junior Advocate
+ */
 export const uploadEvidence = async (req, res, next) => {
     try {
-        // Extract evidence metadata from request body
-        const {
-            title,
-            description,
-            fileUrl,
-            fileType,
-            mimeType,
-            fileSize,
-            caseId,
-            taskId,
-            isConfidential = false
-        } = req.body;
+        const { caseId, description } = req.body;
 
-        // Validate presence of required fields
-        if (!title || !fileUrl || !fileType || !mimeType || !fileSize || !caseId) {
-            const err = new Error("Missing required fields");
+        if (!req.file || !caseId) {
+            const err = new Error("File and caseId are required");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Verify that the referenced case exists
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             const err = new Error("Case not found");
@@ -37,40 +28,21 @@ export const uploadEvidence = async (req, res, next) => {
             return next(err);
         }
 
-        /**
-         * Access control:
-         * - Primary advocate of the case
-         * - Or a junior advocate assigned to the case
-         */
-        const isAdvocate =
-            existingCase.advocate.toString() === req.user._id.toString();
+        const fileType =
+            req.file.mimetype === "application/pdf" ? "pdf" : "image";
 
-        const isAssignedJunior =
-            existingCase.assignedJuniors
-                .map(id => id.toString())
-                .includes(req.user._id.toString());
-
-        if (!isAdvocate && !isAssignedJunior) {
-            const err = new Error("Access denied");
-            err.statusCode = 403;
-            return next(err);
-        }
-
-        // Create evidence record
         const evidence = await Evidence.create({
-            title,
-            description,
-            fileUrl,
-            fileType,
-            mimeType,
-            fileSize,
             case: caseId,
-            task: taskId,
             uploadedBy: req.user._id,
-            isConfidential
+            title: req.file.originalname,
+            fileName: req.file.originalname,
+            filePath: req.file.path,
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype,
+            fileType,
+            description
         });
 
-        // Send successful upload response
         res.status(201).json({
             success: true,
             message: "Evidence uploaded successfully",
@@ -78,7 +50,6 @@ export const uploadEvidence = async (req, res, next) => {
         });
 
     } catch (error) {
-        // Forward unexpected errors to centralized error handler
         next(error);
     }
 };
@@ -96,8 +67,15 @@ export const getEvidence = async (req, res, next) => {
         let filter = {};
 
         /**
+         * Optional case-based filtering (frontend-friendly)
+         */
+        if (req.query.caseId) {
+            filter.case = req.query.caseId;
+        }
+
+        /**
          * CLIENT ACCESS
-         * Clients can view only non-confidential evidence
+         * Clients can view non-confidential evidence
          * related to their own cases
          */
         if (req.user.role === "client") {
@@ -106,7 +84,8 @@ export const getEvidence = async (req, res, next) => {
             }).select("_id");
 
             filter.case = { $in: clientCases.map(c => c._id) };
-            filter.isConfidential = false;
+            // Apply only if schema supports it
+            filter.isConfidential = { $ne: true };
         }
 
         /**
@@ -123,26 +102,28 @@ export const getEvidence = async (req, res, next) => {
 
         /**
          * JUNIOR ADVOCATE ACCESS
-         * Junior advocates can view evidence for assigned cases
+         * Juniors can see:
+         * - Evidence they uploaded
+         * - Evidence for assigned cases (if assigned)
          */
         if (req.user.role === "junior_advocate") {
             const assignedCases = await Case.find({
                 assignedJuniors: req.user._id
             }).select("_id");
 
-            filter.case = { $in: assignedCases.map(c => c._id) };
+            filter.$or = [
+                { uploadedBy: req.user._id },
+                { case: { $in: assignedCases.map(c => c._id) } }
+            ];
         }
 
-        // ADMIN ACCESS
-        // No filter applied — full audit visibility
+        // ADMIN ACCESS → no filter override
 
-        // Fetch evidence with populated relational data
         const evidenceList = await Evidence.find(filter)
             .populate("uploadedBy", "name email role")
             .populate("case", "caseNumber title")
             .sort({ createdAt: -1 });
 
-        // Send response with evidence list
         res.status(200).json({
             success: true,
             count: evidenceList.length,
@@ -150,7 +131,6 @@ export const getEvidence = async (req, res, next) => {
         });
 
     } catch (error) {
-        // Forward errors to centralized error handler
         next(error);
     }
 };
