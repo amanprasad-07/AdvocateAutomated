@@ -3,59 +3,75 @@ import path from "path";
 
 /**
  * Multer storage configuration
- *
- * Defines where uploaded files are stored
- * and how filenames are generated.
  */
 const storage = multer.diskStorage({
-    // Destination folder for uploaded files
     destination: (req, file, cb) => {
         cb(null, "uploads/");
     },
 
-    // Generate a unique filename to avoid collisions
     filename: (req, file, cb) => {
         const uniqueName =
             Date.now() + "-" + Math.round(Math.random() * 1e9);
 
-        // Preserve original file extension
         cb(null, uniqueName + path.extname(file.originalname));
-    }
+    },
 });
 
 /**
  * File filter configuration
  *
- * Restricts uploads to specific MIME types
- * to improve security and data consistency.
+ * Allows all evidence categories supported by the system.
  */
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "application/pdf"
-    ];
+    const mime = file.mimetype;
 
-    // Reject unsupported file types
-    if (!allowedTypes.includes(file.mimetype)) {
-        cb(new Error("Only PDF, JPG, PNG files are allowed"), false);
-    } else {
-        cb(null, true);
+    // -------- Documents --------
+    if (
+        mime === "application/pdf" ||
+        mime === "application/msword" ||
+        mime ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        mime === "application/vnd.ms-excel" ||
+        mime ===
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        mime === "text/plain"
+    ) {
+        return cb(null, true);
     }
+
+    // -------- Images --------
+    if (mime.startsWith("image/")) {
+        return cb(null, true);
+    }
+
+    // -------- Audio --------
+    if (mime.startsWith("audio/")) {
+        return cb(null, true);
+    }
+
+    // -------- Video --------
+    if (mime.startsWith("video/")) {
+        return cb(null, true);
+    }
+
+    // -------- Reject everything else --------
+    cb(
+        new Error(
+            "Unsupported file type. Allowed: documents, images, audio, video."
+        ),
+        false
+    );
 };
 
 /**
  * Multer upload middleware
- *
- * Combines storage and file filtering logic.
- * Can be used in routes as:
- *   upload.single("file")
- *   upload.array("files")
  */
 const upload = multer({
     storage,
-    fileFilter
+    fileFilter,
+    limits: {
+        fileSize: 500 * 1024 * 1024, // 50 MB safeguard
+    },
 });
 
-// Export configured upload middleware
 export default upload;

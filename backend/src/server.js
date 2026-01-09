@@ -16,6 +16,7 @@ import paymentRouter from './routes/paymentRoutes.js';
 import appointmentRouter from './routes/appointmentRoutes.js';
 import clientRouter from './routes/clientRoutes.js';
 import juniorRouter from './routes/juniorRoutes.js';
+import getUsersRouter from './routes/getUsersRoutes.js';
 
 /**
  * Application entry point
@@ -61,14 +62,15 @@ app.use(cookieParser());
  */
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/client", clientRouter);
+app.use("/api/junior", juniorRouter);
 app.use("/api/advocate", advocateRouter);
+app.use("/api/appointments", appointmentRouter);
 app.use("/api/cases", caseRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/evidence", evidenceRouter);
 app.use("/api/payments", paymentRouter);
-app.use("/api/appointments", appointmentRouter);
-app.use("/api/client", clientRouter);
-app.use("/api/junior", juniorRouter);
+app.use("/api/users", getUsersRouter)
 
 /**
  * Static file serving

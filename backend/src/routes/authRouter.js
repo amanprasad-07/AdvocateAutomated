@@ -1,5 +1,6 @@
 import express from "express";
-import { login, register } from "../controller/authController.js";
+import { login, logout, me, register } from "../controller/authController.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const authRouter = express.Router();
 
@@ -25,6 +26,10 @@ authRouter.post("/register", register);
  * Authenticates user credentials and issues JWT.
  */
 authRouter.post("/login", login);
+
+authRouter.post("/logout", logout);
+
+authRouter.get("/me",protect, me);
 
 // Export authentication router for mounting under /api/auth (or similar)
 export default authRouter;

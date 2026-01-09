@@ -1,13 +1,3 @@
-{
-  "name": "Test User",
-  "email": "test@test.com",
-  "address": "Test address",
-  "phone": "12345678",
-  "password": "password123",
-  "passwordConfirm": "password123",
-  "role": "advocate"
-}
-
 
 import crypto from "crypto";
 
@@ -23,18 +13,223 @@ const signature = crypto
   .digest("hex");
 
 console.log(signature);
+
+admin email: admin@system.com
+admin password: Admin@123
+
+1️⃣ AUTH MODULE
+🔹 Register – Client
+
+POST /api/auth/register
+
+{
+  "name": "Client One",
+  "email": "client1@test.com",
+  "address": "Kochi, Kerala",
+  "phone": "98765432",
+  "password": "password123",
+  "passwordConfirm": "password123",
+  "role": "client"
+}
+
+🔹 Register – Advocate
+{
+  "name": "Advocate One",
+  "email": "advocate1@test.com",
+  "address": "Ernakulam",
+  "phone": "91234567",
+  "password": "password123",
+  "passwordConfirm": "password123",
+  "role": "advocate"
+}
+
+🔹 Register – Junior Advocate
+{
+  "name": "Junior Advocate One",
+  "email": "junior1@test.com",
+  "address": "Thrissur",
+  "phone": "99887766",
+  "password": "password123",
+  "passwordConfirm": "password123",
+  "role": "junior_advocate"
+}
+
+🔹 Login
+
+POST /api/auth/login
+
+{
+  "email": "advocate1@test.com",
+  "password": "password123"
+}
+
+2️⃣ ADMIN MODULE
+🔹 Get Pending Advocates
+
+GET /api/admin/pending-advocates
+
+(no body)
+
+🔹 Approve Advocate
+
+PATCH /api/admin/advocates/:userId/approve
+
+(no body)
+
+🔹 Reject Advocate
+
+PATCH /api/admin/advocates/:userId/reject
+
+(no body)
+
+3️⃣ CASE MODULE
+🔹 Create Case (Advocate)
+
+POST /api/cases
+
+{
+  "caseNumber": "CASE-2025-001",
+  "title": "Property Dispute Case",
+  "description": "Dispute regarding ancestral property ownership",
+  "caseType": "civil",
+  "clientId": "CLIENT_OBJECT_ID",
+  "assignedJuniors": ["JUNIOR_OBJECT_ID"]
+}
+
+🔹 Get Cases (Role-based)
+
+GET /api/cases
+
+(no body)
+
+🔹 Update Case Status
+
+PATCH /api/cases/:caseId/status
+
+{
+  "status": "in_progress"
+}
+
+4️⃣ TASK MODULE
+🔹 Create Task (Advocate)
+
+POST /api/tasks
+
+{
+  "title": "Prepare Legal Notice",
+  "description": "Draft and review legal notice for client",
+  "caseId": "CASE_OBJECT_ID",
+  "assignedTo": "JUNIOR_OBJECT_ID",
+  "priority": "high",
+  "dueDate": "2025-01-10"
+}
+
+🔹 Get Tasks
+
+GET /api/tasks
+
+(no body)
+
+🔹 Update Task Status (Junior)
+
+PATCH /api/tasks/:taskId/status
+
+{
+  "status": "completed"
+}
+
+5️⃣ EVIDENCE MODULE (MULTER)
+🔹 Upload Evidence
+
+POST /api/evidence
+Form-Data
+
+file        → (upload PDF / PNG / JPG)
+caseId      → CASE_OBJECT_ID
+description → Sale deed document
+
+🔹 Get Evidence
+
+GET /api/evidence
+
+Optional query:
+
+/api/evidence?caseId=CASE_OBJECT_ID
+
+6️⃣ PAYMENT MODULE
+🔹 Manual Payment (Advocate)
+
+POST /api/payments/manual
+
+{
+  "amount": 15000,
+  "paymentFor": "Initial consultation fee",
+  "caseId": "CASE_OBJECT_ID",
+  "paymentMethod": "cash",
+  "transactionId": "CASH-001"
+}
+
+🔹 Razorpay – Create Order
+
+POST /api/payments/create-order
+
+{
+  "amount": 15000
+}
+
+🔹 Razorpay – Verify Payment
+
+POST /api/payments/verify
+
 {
   "razorpay_order_id": "order_RwBdpjWZEQLEeY",
   "razorpay_payment_id": "pay_test_002",
   "razorpay_signature": "ef8035cea1055792c58c33fb1eb6e42e30c20ae5ddde194598b6af5d94bf41c7",
-  "caseId": "694d670ccd5e245e0aad0f77",
+  "caseId": "CASE_OBJECT_ID",
   "amount": 15000
 }
 
+🔹 Get Payments
+
+GET /api/payments
+
+(no body)
+
+🔹 Update Payment Status
+
+PATCH /api/payments/:paymentId/status
 
 {
-  "advocateId": "694bce849ce621dd6053276f",
+  "status": "completed"
+}
+
+7️⃣ APPOINTMENT MODULE
+🔹 Create Appointment
+
+POST /api/appointments
+
+{
+  "advocateId": "ADVOCATE_OBJECT_ID",
   "date": "2025-01-05",
   "timeSlot": "10:00 - 10:30",
   "purpose": "Legal consultation regarding property dispute"
 }
+
+🔹 Get Appointments
+
+GET /api/appointments
+
+(no body)
+
+8️⃣ DASHBOARDS
+🔹 Advocate Dashboard
+
+GET /api/advocate/dashboard
+
+🔹 Junior Advocate Dashboard
+
+GET /api/junior/dashboard
+
+🔹 Client Dashboard
+
+GET /api/client/dashboard

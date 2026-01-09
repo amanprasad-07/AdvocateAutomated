@@ -20,7 +20,7 @@ const advocateRouter = express.Router();
 advocateRouter.get(
     "/dashboard",
     protect,
-    requireRole("advocate", "junior_advocate"),
+    requireRole("advocate"),
     getAdvocateDashboard
 );
 

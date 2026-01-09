@@ -40,7 +40,7 @@ evidenceRouter.post(
 evidenceRouter.get(
     "/",
     protect,
-    requireRole("advocate", "junior_advocate", "client", "admin"),
+    requireRole("advocate", "junior_advocate", "admin"),
     getEvidence
 );
 

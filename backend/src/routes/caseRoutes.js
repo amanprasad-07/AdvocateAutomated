@@ -2,6 +2,7 @@ import express from "express";
 import {
     createCase,
     getCases,
+    getCaseById,
     updateCaseStatus
 } from "../controller/caseController.js";
 import { protect, requireRole } from "../middleware/authMiddleware.js";
@@ -52,6 +53,12 @@ caseRouter.patch(
     protect,
     requireRole("advocate"),
     updateCaseStatus
+);
+
+caseRouter.get(
+  "/:caseId",
+  protect,
+  getCaseById
 );
 
 // Export case router for mounting under /api/cases (or similar)

@@ -46,6 +46,13 @@ const caseSchema = new mongoose.Schema(
          * Relationship mappings
          */
 
+        appointment: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Appointment",
+            unique: true,
+            required: true
+        },
+
         // Client associated with the case
         client: {
             type: mongoose.Schema.Types.ObjectId,

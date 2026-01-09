@@ -57,7 +57,7 @@ const evidenceSchema = new mongoose.Schema(
         // Logical file category derived from MIME type
         fileType: {
             type: String,
-            enum: ["pdf", "image"],
+            enum: ["document", "image","audio","video","other"],
             required: true
         },
 

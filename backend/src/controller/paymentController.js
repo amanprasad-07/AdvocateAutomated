@@ -2,6 +2,7 @@ import Payment from "../model/payment.js";
 import Case from "../model/case.js";
 import razorpay from "../services/razorpay.js";
 import crypto from "crypto";
+import { logAuditEvent } from "../utils/auditLogger.js";
 
 /**
  * Create / record a manual payment
@@ -53,7 +54,7 @@ export const createManualPayment = async (req, res, next) => {
             receivedBy: req.user._id,
             paymentMethod,
             transactionId,
-            status: "completed",
+            status: "paid",
             paidAt: new Date()
         });
 
@@ -136,7 +137,7 @@ export const updatePaymentStatus = async (req, res, next) => {
         const { status } = req.body;
 
         // Validate payment status value
-        if (!["pending", "completed", "failed"].includes(status)) {
+        if (!["pending", "paid", "failed"].includes(status)) {
             const err = new Error("Invalid payment status");
             err.statusCode = 400;
             return next(err);
@@ -159,7 +160,7 @@ export const updatePaymentStatus = async (req, res, next) => {
 
         // Update payment status and completion timestamp if applicable
         payment.status = status;
-        if (status === "completed") {
+        if (status === "paid") {
             payment.paidAt = new Date();
         }
 
@@ -221,23 +222,19 @@ export const createRazorpayOrder = async (req, res, next) => {
  */
 export const verifyRazorpayPayment = async (req, res, next) => {
     try {
-        // Extract Razorpay verification fields
         const {
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature,
-            caseId,
-            amount
-        } = req.body || {};
+            paymentId
+        } = req.body;
 
-        // Validate required Razorpay fields
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !paymentId) {
             const err = new Error("Missing Razorpay verification fields");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Generate expected signature
         const body = razorpay_order_id + "|" + razorpay_payment_id;
 
         const expectedSignature = crypto
@@ -245,14 +242,70 @@ export const verifyRazorpayPayment = async (req, res, next) => {
             .update(body)
             .digest("hex");
 
-        // Verify signature integrity
         if (expectedSignature !== razorpay_signature) {
             const err = new Error("Payment verification failed");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Verify case existence
+        const payment = await Payment.findById(paymentId);
+        if (!payment) {
+            const err = new Error("Payment not found");
+            err.statusCode = 404;
+            return next(err);
+        }
+
+        payment.status = "paid";
+        payment.transactionId = razorpay_payment_id;
+        payment.paidAt = new Date();
+
+        await payment.save();
+
+        try {
+            await logAuditEvent({
+                action: "PAYMENT_COMPLETED",
+                entityType: "Payment",
+                entityId: payment._id,
+                performedBy: req.user._id,
+                message: `Payment of ₹${amount} completed`,
+                metadata: {
+                    role: req.user.role,
+                    email: req.user.email,
+                    reviewedAt: new Date(),
+                },
+            });
+        } catch (auditError) {
+            console.warn("Audit logging failed:", auditError.message);
+        }
+
+
+        res.status(200).json({
+            success: true,
+            message: "Payment verified and completed",
+            data: payment
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+/**
+ * Create bill (request payment)
+ *
+ * Advocate creates a pending payment request for a client
+ */
+export const createBill = async (req, res, next) => {
+    try {
+        const { caseId, amount, paymentFor } = req.body;
+
+        if (!caseId || !amount || !paymentFor) {
+            const err = new Error("Missing required fields");
+            err.statusCode = 400;
+            return next(err);
+        }
+
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             const err = new Error("Case not found");
@@ -260,43 +313,80 @@ export const verifyRazorpayPayment = async (req, res, next) => {
             return next(err);
         }
 
-        // Only the assigned advocate can verify and record payment
+        if (existingCase.status === "closed") {
+            const err = new Error(
+                "Case is completed. No further changes are allowed."
+            );
+            err.statusCode = 403;
+            return next(err);
+        }
+
+        // Only the advocate of the case can bill
         if (existingCase.advocate.toString() !== req.user._id.toString()) {
             const err = new Error("Access denied");
             err.statusCode = 403;
             return next(err);
         }
 
-        // Validate payment amount
-        if (!amount || amount <= 0) {
-            const err = new Error("Invalid amount");
+        const payment = await Payment.create({
+            amount,
+            currency: "INR",
+            paymentFor,
+            case: caseId,
+            client: existingCase.client,
+            receivedBy: req.user._id,
+            paymentMethod: "razorpay", // default
+            status: "pending"
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "Payment request created",
+            data: payment
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Delete payment (only if pending)
+ *
+ * Accessible only to advocate who created it
+ */
+export const deletePayment = async (req, res, next) => {
+    try {
+        const { paymentId } = req.params;
+
+        const payment = await Payment.findById(paymentId);
+        if (!payment) {
+            const err = new Error("Payment not found");
+            err.statusCode = 404;
+            return next(err);
+        }
+
+        if (payment.receivedBy.toString() !== req.user._id.toString()) {
+            const err = new Error("Access denied");
+            err.statusCode = 403;
+            return next(err);
+        }
+
+        if (payment.status !== "pending") {
+            const err = new Error("Only pending bills can be deleted");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Record verified Razorpay payment
-        const payment = await Payment.create({
-            amount,
-            currency: "INR",
-            paymentFor: "Case payment",
-            case: caseId,
-            client: existingCase.client,
-            receivedBy: req.user._id,
-            paymentMethod: "razorpay",
-            transactionId: razorpay_payment_id,
-            status: "completed",
-            paidAt: new Date(),
-        });
+        await payment.deleteOne();
 
-        // Send confirmation response
-        res.status(201).json({
+        res.status(200).json({
             success: true,
-            message: "Payment verified and saved",
-            data: payment,
+            message: "Bill deleted successfully"
         });
 
     } catch (error) {
-        // Forward unexpected errors to centralized error handler
         next(error);
     }
 };
+

@@ -73,7 +73,18 @@ const appointmentSchema = new mongoose.Schema(
         notes: {
             type: String,
             trim: true
+        },
+
+        caseCreated: {
+            type: Boolean,
+            default: false
+        },
+
+        linkedCase: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Case"
         }
+
     },
     {
         timestamps: true

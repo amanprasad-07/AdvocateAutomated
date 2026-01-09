@@ -17,7 +17,6 @@ const taskSchema = new mongoose.Schema(
         // Detailed explanation of the task
         description: {
             type: String,
-            required: true,
             trim: true
         },
 

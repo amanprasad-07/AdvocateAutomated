@@ -1,7 +1,7 @@
 import express from "express";
 import {
     createTask,
-    getTasks,
+    getTasksByCase,
     updateTaskStatus
 } from "../controller/taskController.js";
 import { protect, requireRole } from "../middleware/authMiddleware.js";
@@ -35,11 +35,12 @@ taskRouter.post(
  * - Advocates: tasks they assigned
  * - Junior advocates: tasks assigned to them
  */
+
 taskRouter.get(
-    "/",
-    protect,
-    requireRole("advocate", "junior_advocate"),
-    getTasks
+  "/case/:caseId",
+  protect,
+  requireRole("advocate","junior_advocate"),
+  getTasksByCase
 );
 
 /**

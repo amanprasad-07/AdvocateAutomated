@@ -25,6 +25,33 @@ export const createAppointment = async (req, res, next) => {
             return next(err);
         }
 
+        const appointmentDate = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (appointmentDate < today) {
+            const err = new Error("Appointment date cannot be in the past");
+            err.statusCode = 400;
+            return next(err);
+        }
+
+        // Prevent double booking for same advocate, date, and time slot
+        const existingAppointment = await Appointment.findOne({
+            advocate: advocateId,
+            date,
+            timeSlot,
+            status: { $in: ["requested", "approved"] }
+        });
+
+        if (existingAppointment) {
+            const err = new Error(
+                "This time slot is already booked for the selected advocate"
+            );
+            err.statusCode = 400;
+            return next(err);
+        }
+
+
         const appointment = await Appointment.create({
             client: req.user._id,
             advocate: advocateId,
@@ -61,6 +88,7 @@ export const getAppointments = async (req, res, next) => {
 
         if (req.user.role === "advocate") {
             filter.advocate = req.user._id;
+            filter.caseCreated = { $ne: true };
         }
 
         const appointments = await Appointment.find(filter)
@@ -89,7 +117,7 @@ export const updateAppointmentStatus = async (req, res, next) => {
         const { appointmentId } = req.params;
         const { status, notes } = req.body;
 
-        if (!["approved", "rejected", "completed"].includes(status)) {
+        if (!["approved", "rejected"].includes(status)) {
             const err = new Error("Invalid appointment status");
             err.statusCode = 400;
             return next(err);
@@ -102,10 +130,26 @@ export const updateAppointmentStatus = async (req, res, next) => {
             return next(err);
         }
 
-        // Only assigned advocate can update appointment
+        // Only assigned advocate can update
         if (appointment.advocate.toString() !== req.user._id.toString()) {
             const err = new Error("Access denied");
             err.statusCode = 403;
+            return next(err);
+        }
+
+        // Enforce workflow
+        if (appointment.status !== "requested") {
+            const err = new Error(
+                `Appointment cannot be ${status} once it is ${appointment.status}`
+            );
+            err.statusCode = 400;
+            return next(err);
+        }
+
+        // Reject must have a reason
+        if (status === "rejected" && (!notes || notes.trim() === "")) {
+            const err = new Error("Rejection reason is required");
+            err.statusCode = 400;
             return next(err);
         }
 
@@ -116,11 +160,12 @@ export const updateAppointmentStatus = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: "Appointment updated successfully",
+            message: `Appointment ${status} successfully`,
             data: appointment
         });
 
     } catch (error) {
         next(error);
     }
+
 };

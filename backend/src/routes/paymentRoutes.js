@@ -4,7 +4,9 @@ import {
     createRazorpayOrder,
     verifyRazorpayPayment,
     getPayments,
-    updatePaymentStatus
+    updatePaymentStatus,
+    createBill,
+    deletePayment
 } from "../controller/paymentController.js";
 import { protect, requireRole } from "../middleware/authMiddleware.js";
 
@@ -43,7 +45,7 @@ paymentRouter.post(
 paymentRouter.post(
     "/create-order",
     protect,
-    requireRole("advocate"),
+    requireRole("advocate","client"),
     createRazorpayOrder
 );
 
@@ -56,7 +58,7 @@ paymentRouter.post(
 paymentRouter.post(
     "/verify",
     protect,
-    requireRole("advocate"),
+    requireRole("advocate","client"),
     verifyRazorpayPayment
 );
 
@@ -89,6 +91,20 @@ paymentRouter.patch(
     protect,
     requireRole("advocate"),
     updatePaymentStatus
+);
+
+paymentRouter.post(
+    "/bill",
+    protect,
+    requireRole("advocate"),
+    createBill
+);
+
+paymentRouter.delete(
+    "/:paymentId",
+    protect,
+    requireRole("advocate"),
+    deletePayment
 );
 
 // Export payment router for mounting under /api/payments (or similar)
