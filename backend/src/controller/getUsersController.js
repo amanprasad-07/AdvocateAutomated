@@ -9,7 +9,7 @@ import User from "../model/user.js";
  */
 export const getAllAdvocates = async (req, res, next) => {
   try {
-   
+
 
     const allowedRoles = ["client", "admin"];
 
@@ -20,7 +20,7 @@ export const getAllAdvocates = async (req, res, next) => {
       });
     }
 
-    const advocates = await User.find({ role: "advocate" })
+    const advocates = await User.find({ role: "advocate", verificationStatus: "approved", })
       .select("_id name email role verificationStatus lastLoginAt createdAt")
       .sort({ createdAt: -1 });
 
@@ -101,7 +101,7 @@ export const getAllJuniors = async (req, res, next) => {
         message: "Access denied",
       });
     }
-    const juniors = await User.find({ role: "junior_advocate" })
+    const juniors = await User.find({ role: "junior_advocate", verificationStatus: "approved", })
       .select(
         "_id name email role verificationStatus lastLoginAt createdAt"
       )

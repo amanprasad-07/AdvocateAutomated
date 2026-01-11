@@ -1,21 +1,9 @@
 import multer from "multer";
-import path from "path";
 
 /**
  * Multer storage configuration
  */
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/");
-    },
-
-    filename: (req, file, cb) => {
-        const uniqueName =
-            Date.now() + "-" + Math.round(Math.random() * 1e9);
-
-        cb(null, uniqueName + path.extname(file.originalname));
-    },
-});
+const storage = multer.memoryStorage()
 
 /**
  * File filter configuration
@@ -30,10 +18,10 @@ const fileFilter = (req, file, cb) => {
         mime === "application/pdf" ||
         mime === "application/msword" ||
         mime ===
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         mime === "application/vnd.ms-excel" ||
         mime ===
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         mime === "text/plain"
     ) {
         return cb(null, true);

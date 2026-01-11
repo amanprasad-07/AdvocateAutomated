@@ -1,6 +1,7 @@
 import Evidence from "../model/evidence.js";
 import Case from "../model/case.js";
 import { logAuditEvent } from "../utils/auditLogger.js";
+import cloudinary from "../utils/cloudinary.js";
 
 /* ---------- Helper ---------- */
 const deriveFileType = (mimeType) => {
@@ -65,14 +66,40 @@ export const uploadEvidence = async (req, res, next) => {
             return next(err);
         }
 
+        // Auto-transition: OPEN → IN_PROGRESS
+        if (existingCase.status === "open") {
+            existingCase.status = "in_progress";
+            await existingCase.save();
+        }
+
         const fileType = deriveFileType(req.file.mimetype);
+
+        const isPdf = req.file.mimetype === "application/pdf";
+
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream(
+                {
+                    folder: `case_evidence/${caseId}`,
+                    resource_type: isPdf ? "raw" : "auto",
+                    access_mode: "public",
+                    use_filename: true,
+                    unique_filename: true,
+                },
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            ).end(req.file.buffer);
+        });
+
 
         const evidence = await Evidence.create({
             case: caseId,
             uploadedBy: req.user._id,
             title: req.file.originalname,
             fileName: req.file.originalname,
-            filePath: req.file.path,
+            filePath: uploadResult.secure_url,
+            cloudinaryId: uploadResult.public_id,
             fileSize: req.file.size,
             mimeType: req.file.mimetype,
             fileType,

@@ -50,6 +50,12 @@ export const createTask = async (req, res, next) => {
             return next(err);
         }
 
+        // Auto-transition: OPEN → IN_PROGRESS
+        if (existingCase.status === "open") {
+            existingCase.status = "in_progress";
+            await existingCase.save();
+        }
+
         // Create task record
         const task = await Task.create({
             title,

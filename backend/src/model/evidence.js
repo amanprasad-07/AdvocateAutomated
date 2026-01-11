@@ -42,6 +42,11 @@ const evidenceSchema = new mongoose.Schema(
             required: true
         },
 
+        cloudinaryId: {
+            type: String,
+            required: true,
+        },
+
         // File size in bytes (used for validation and auditing)
         fileSize: {
             type: Number,
@@ -57,7 +62,7 @@ const evidenceSchema = new mongoose.Schema(
         // Logical file category derived from MIME type
         fileType: {
             type: String,
-            enum: ["document", "image","audio","video","other"],
+            enum: ["document", "image", "audio", "video", "other"],
             required: true
         },
 

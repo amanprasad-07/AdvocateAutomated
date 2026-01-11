@@ -19,7 +19,7 @@ export const createAppointment = async (req, res, next) => {
 
         // Ensure selected user is an advocate
         const advocate = await User.findById(advocateId);
-        if (!advocate || advocate.role !== "advocate") {
+        if (!advocate || advocate.role !== "advocate" || advocate.verificationStatus !== "approved") {
             const err = new Error("Invalid advocate");
             err.statusCode = 400;
             return next(err);
