@@ -55,10 +55,11 @@ export const getPendingAdvocates = async (req, res, next) => {
     // Query users with advocate roles awaiting verification
     const pendingAdvocates = await User.find({
       role: { $in: ["advocate", "junior_advocate"] },
-      verificationStatus: "pending"
+      verificationStatus: "pending",
+      "advocateProfile.submittedAt": { $exists: true }
     })
       // Limit returned fields to essential review information
-      .select("name email role createdAt");
+      .select("name email role createdAt advocateProfile");
 
     // Send successful response with count and data
     res.status(200).json({
@@ -97,6 +98,28 @@ export const approveAdvocate = async (req, res, next) => {
       error.statusCode = 400;
       return next(error);
     }
+
+    // Ensure verification details were submitted
+    if (!user.advocateProfile?.submittedAt) {
+      const error = new Error(
+        "Cannot approve advocate without submitted verification details"
+      );
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    if (user.verificationStatus !== "pending") {
+      const error = new Error("Verification already processed");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    if (user.verificationStatus === "rejected") {
+      const err = new Error("Rejected advocates must resubmit verification");
+      err.statusCode = 400;
+      return next(err);
+    }
+
 
     // Update verification status and audit metadata
     user.verificationStatus = "approved";
@@ -163,10 +186,26 @@ export const rejectAdvocate = async (req, res, next) => {
       return next(error);
     }
 
+    if (user.verificationStatus !== "pending") {
+      const error = new Error("Verification already processed");
+      error.statusCode = 400;
+      return next(error);
+    }
+
     // Update verification status and audit metadata
+    const { reason } = req.body;
+
+    if (!reason) {
+      const err = new Error("Rejection reason is required");
+      err.statusCode = 400;
+      return next(err);
+    }
+
     user.verificationStatus = "rejected";
+    user.verificationRejectionReason = reason;
     user.verificationReviewedAt = new Date();
     user.verificationReviewedBy = req.user._id;
+
 
     // Save changes without triggering full validation
     await user.save({ validateBeforeSave: false });

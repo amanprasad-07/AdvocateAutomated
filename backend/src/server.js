@@ -17,6 +17,7 @@ import appointmentRouter from './routes/appointmentRoutes.js';
 import clientRouter from './routes/clientRoutes.js';
 import juniorRouter from './routes/juniorRoutes.js';
 import getUsersRouter from './routes/getUsersRoutes.js';
+import verificationRouter from './routes/verificationRoutes.js';
 
 /**
  * Application entry point
@@ -71,6 +72,7 @@ app.use("/api/tasks", taskRouter);
 app.use("/api/evidence", evidenceRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/users", getUsersRouter)
+app.use("/api/verification", verificationRouter)
 
 /**
  * Static file serving

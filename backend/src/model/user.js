@@ -103,12 +103,18 @@ const userSchema = new mongoose.Schema(
             ref: "User"
         },
 
+        verificationRejectionReason: {
+            type: String,
+            trim: true
+        },
+
         // Advocate-specific professional details
         advocateProfile: {
-            enrollmentNumber: String,
-            barCouncil: String,
+            enrollmentNumber: { type: String, trim: true },
+            barCouncil: { type: String, trim: true },
             experienceYears: Number,
-            documents: [String] // File paths or document identifiers
+            documents: [String],
+            submittedAt: Date
         },
 
         // Tracks last successful login time
