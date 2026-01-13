@@ -5,17 +5,18 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 const advocateRouter = express.Router();
 
 /**
- * Advocate routes
+ * Advocate Routes
  *
- * Routes related to advocate and junior advocate dashboards
- * and role-specific functionality.
+ * Contains routes related to advocate-specific
+ * dashboards and functionality.
  */
 
 /**
  * GET /dashboard
  *
- * Returns dashboard data for advocates and junior advocates.
- * Accessible even if verification is pending.
+ * Returns dashboard data for advocates.
+ * Authentication is required.
+ * Verification status is not enforced for this endpoint.
  */
 advocateRouter.get(
     "/dashboard",

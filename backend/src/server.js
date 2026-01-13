@@ -20,46 +20,48 @@ import getUsersRouter from './routes/getUsersRoutes.js';
 import verificationRouter from './routes/verificationRoutes.js';
 
 /**
- * Application entry point
+ * Application Entry Point
  *
- * Responsible for:
- * - Loading environment variables
- * - Initializing the Express application
- * - Registering global middleware
- * - Mounting all API routes
- * - Connecting to the database
- * - Starting the HTTP server
+ * Responsibilities:
+ * - Load environment variables
+ * - Initialize the Express application
+ * - Register global middleware
+ * - Mount all API routes
+ * - Connect to the database
+ * - Start the HTTP server
  */
 
 // Load environment variables before accessing process.env
 dotenv.config();
 
+// Initialize Express application
 const app = express();
 
-/**
- * Global middleware
- */
+/* -------------------------------------------------------------------------- */
+/*                               Global Middleware                             */
+/* -------------------------------------------------------------------------- */
 
-// Parse incoming JSON request bodies
-// Enables Express to read req.body for JSON payloads
+// Parse incoming JSON payloads
+// Enables access to req.body for JSON-based requests
 app.use(express.json());
 
-// Enable CORS with credentials support
-// Required for cookie-based authentication with frontend
+// Enable Cross-Origin Resource Sharing
+// Allows frontend applications to send cookies for authentication
 app.use(cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true
 }));
 
-// Parse cookies from incoming requests
-// Required for JWT stored in HTTP-only cookies
+// Parse cookies attached to incoming requests
+// Required for JWT-based authentication using HTTP-only cookies
 app.use(cookieParser());
 
+/* -------------------------------------------------------------------------- */
+/*                               Route Mounting                                */
+/* -------------------------------------------------------------------------- */
 /**
- * Route mounting
- *
- * Each router encapsulates a specific domain
- * and enforces its own authentication and authorization logic.
+ * Each router is responsible for a specific domain
+ * and enforces its own authentication and authorization rules.
  */
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
@@ -71,44 +73,53 @@ app.use("/api/cases", caseRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/evidence", evidenceRouter);
 app.use("/api/payments", paymentRouter);
-app.use("/api/users", getUsersRouter)
-app.use("/api/verification", verificationRouter)
+app.use("/api/users", getUsersRouter);
+app.use("/api/verification", verificationRouter);
 
+/* -------------------------------------------------------------------------- */
+/*                             Static File Serving                              */
+/* -------------------------------------------------------------------------- */
 /**
- * Static file serving
- *
- * Exposes uploaded files for controlled access.
- * Typically used for serving evidence files uploaded via Multer.
+ * Serves static files from the uploads directory.
+ * Typically used for accessing uploaded evidence files.
  */
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+/* -------------------------------------------------------------------------- */
+/*                         Centralized Error Handling                           */
+/* -------------------------------------------------------------------------- */
 /**
- * Centralized error-handling middleware
- *
- * Must be registered AFTER all routes
- * to properly capture propagated errors.
+ * Global error handler.
+ * Must be registered after all routes to catch propagated errors.
  */
 app.use(errorHandler);
 
-/**
- * Database connection and server startup
- */
+/* -------------------------------------------------------------------------- */
+/*                     Database Connection & Server Startup                     */
+/* -------------------------------------------------------------------------- */
+
+// Resolve port from environment or fallback to default
 const PORT = process.env.PORT || 5000;
 
+/**
+ * Starts the application by:
+ * - Establishing a database connection
+ * - Launching the HTTP server
+ */
 const startServer = async () => {
     try {
-        // Establish database connection before accepting requests
+        // Connect to the database before accepting requests
         await connectDb();
 
-        // Start HTTP server
+        // Start listening for incoming HTTP requests
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
     } catch (error) {
-        // Fail fast if server initialization fails
+        // Fail fast if startup or database connection fails
         console.error("Failed to start server", error.message);
     }
 };
 
-// Initialize application
+// Bootstrap the application
 startServer();

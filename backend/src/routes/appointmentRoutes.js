@@ -9,7 +9,17 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 const appointmentRouter = express.Router();
 
 /**
- * Client requests an appointment
+ * Appointment Routes
+ *
+ * Defines endpoints for creating, viewing,
+ * and managing appointments.
+ */
+
+/**
+ * POST /
+ *
+ * Allows a client to request an appointment
+ * with an advocate.
  */
 appointmentRouter.post(
     "/",
@@ -19,10 +29,12 @@ appointmentRouter.post(
 );
 
 /**
- * Get appointments (role-based)
- * Client → own appointments
- * Advocate → assigned appointments
- * Admin → all appointments
+ * GET /
+ *
+ * Retrieves appointments based on user role:
+ * - Client: own appointments
+ * - Advocate: appointments assigned to them
+ * - Admin: all appointments
  */
 appointmentRouter.get(
     "/",
@@ -32,8 +44,10 @@ appointmentRouter.get(
 );
 
 /**
- * Advocate updates appointment status
- * Approve / Reject / Complete
+ * PATCH /:appointmentId/status
+ *
+ * Allows an advocate to approve or reject
+ * a requested appointment.
  */
 appointmentRouter.patch(
     "/:appointmentId/status",

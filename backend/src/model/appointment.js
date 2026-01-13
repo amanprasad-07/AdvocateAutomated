@@ -2,18 +2,22 @@ import mongoose from "mongoose";
 
 /**
  * Appointment Schema
- * -------------------
- * Represents a scheduled interaction between a client and an advocate.
- * Appointments are independent of cases and can later lead to case creation.
+ * ------------------
+ * Defines the structure for appointment records between
+ * clients and advocates.
  *
- * Flow:
+ * Appointments are standalone entities and may optionally
+ * result in a case being created later in the workflow.
+ *
+ * Typical lifecycle:
  * Client → requests appointment
- * Advocate → approves / rejects / completes
+ * Advocate → approves / rejects
+ * Advocate → completes (optionally creates a case)
  */
 const appointmentSchema = new mongoose.Schema(
     {
         /**
-         * Client who requested the appointment
+         * Reference to the client who requested the appointment.
          */
         client: {
             type: mongoose.Schema.Types.ObjectId,
@@ -22,7 +26,7 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Advocate with whom the appointment is scheduled
+         * Reference to the advocate with whom the appointment is scheduled.
          */
         advocate: {
             type: mongoose.Schema.Types.ObjectId,
@@ -31,7 +35,7 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Date of the appointment
+         * Calendar date on which the appointment is scheduled.
          */
         date: {
             type: Date,
@@ -39,8 +43,11 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Time slot for the appointment
-         * Stored as string for simplicity (e.g. "10:00 - 10:30")
+         * Time range for the appointment.
+         *
+         * Stored as a string to keep scheduling flexible
+         * and avoid strict time calculations at the schema level.
+         * Example: "10:00 - 10:30"
          */
         timeSlot: {
             type: String,
@@ -48,7 +55,7 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Purpose or reason for the appointment
+         * Brief description explaining the purpose of the appointment.
          */
         purpose: {
             type: String,
@@ -57,9 +64,12 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Current appointment status
-         * requested → approved → completed
-         * requested → rejected
+         * Current status of the appointment.
+         *
+         * requested  → initial state after client submission
+         * approved   → accepted by advocate
+         * rejected   → declined by advocate
+         * completed  → appointment concluded
          */
         status: {
             type: String,
@@ -68,18 +78,27 @@ const appointmentSchema = new mongoose.Schema(
         },
 
         /**
-         * Optional notes added by advocate (remarks, follow-ups, etc.)
+         * Optional notes added by the advocate.
+         * Can include remarks, observations, or next steps.
          */
         notes: {
             type: String,
             trim: true
         },
 
+        /**
+         * Flag indicating whether this appointment
+         * has resulted in a case being created.
+         */
         caseCreated: {
             type: Boolean,
             default: false
         },
 
+        /**
+         * Reference to the case created from this appointment,
+         * if applicable.
+         */
         linkedCase: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Case"
@@ -87,6 +106,9 @@ const appointmentSchema = new mongoose.Schema(
 
     },
     {
+        /**
+         * Automatically adds createdAt and updatedAt timestamps.
+         */
         timestamps: true
     }
 );

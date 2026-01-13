@@ -5,16 +5,18 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 const juniorRouter = express.Router();
 
 /**
- * Junior Advocate routes
+ * Junior Advocate Routes
  *
- * Routes dedicated to junior advocate–specific dashboard functionality.
+ * Contains endpoints specific to
+ * junior advocate dashboard functionality.
  */
 
 /**
  * GET /dashboard
  *
- * Returns consolidated dashboard data for the authenticated junior advocate,
- * including tasks, assigned cases, and uploaded evidence.
+ * Returns consolidated dashboard data for the
+ * authenticated junior advocate, including
+ * tasks, assigned cases, and uploaded evidence.
  */
 juniorRouter.get(
     "/dashboard",

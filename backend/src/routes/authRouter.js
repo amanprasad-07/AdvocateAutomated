@@ -5,11 +5,18 @@ import { protect } from "../middleware/authMiddleware.js";
 const authRouter = express.Router();
 
 /**
- * Authentication routes
+ * Authentication Routes
  *
- * Handles user registration and login.
- * These routes are intentionally public and
- * do not require authentication middleware.
+ * Handles user registration, login, logout,
+ * and retrieval of the authenticated user's profile.
+ *
+ * Public routes:
+ * - register
+ * - login
+ *
+ * Protected routes:
+ * - me
+ * - logout
  */
 
 /**
@@ -23,13 +30,24 @@ authRouter.post("/register", register);
 /**
  * POST /login
  *
- * Authenticates user credentials and issues JWT.
+ * Authenticates user credentials and issues a JWT.
  */
 authRouter.post("/login", login);
 
+/**
+ * POST /logout
+ *
+ * Terminates the authenticated session
+ * by clearing the authentication cookie.
+ */
 authRouter.post("/logout", logout);
 
-authRouter.get("/me",protect, me);
+/**
+ * GET /me
+ *
+ * Returns the currently authenticated user's details.
+ */
+authRouter.get("/me", protect, me);
 
 // Export authentication router for mounting under /api/auth (or similar)
 export default authRouter;

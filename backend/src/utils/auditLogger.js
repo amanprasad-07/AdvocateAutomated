@@ -1,7 +1,11 @@
 import AuditLog from "../model/auditLog.js";
 
 /**
- * Centralized audit logging helper
+ * Centralized Audit Logging Utility
+ *
+ * Records auditable system actions in a non-blocking manner.
+ * Failures in audit logging must never interrupt
+ * the primary application flow.
  */
 export const logAuditEvent = async ({
   action,
@@ -12,6 +16,7 @@ export const logAuditEvent = async ({
   metadata,
 }) => {
   try {
+    // Persist audit event with contextual metadata
     await AuditLog.create({
       action,
       entityType,
@@ -21,7 +26,7 @@ export const logAuditEvent = async ({
       metadata,
     });
   } catch (err) {
-    // Audit logs must NEVER break the main flow
+    // Audit logging failures are intentionally non-fatal
     console.error("Audit log failed:", err.message);
   }
 };

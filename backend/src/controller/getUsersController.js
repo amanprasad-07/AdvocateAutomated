@@ -1,18 +1,22 @@
 import User from "../model/user.js";
 
 /**
- * Fetch users with role = advocate.
+ * Get All Advocates Controller
  *
- * Intended for populating selection lists
- * (e.g., dropdowns for assigning cases, appointments, juniors).
- * Returns limited, non-sensitive user fields only.
+ * Retrieves all approved advocates.
+ * Intended for populating selection lists such as
+ * case assignment, appointment booking, or junior allocation.
+ *
+ * Access is restricted to clients and administrators.
+ * Only non-sensitive user fields are returned.
  */
 export const getAllAdvocates = async (req, res, next) => {
   try {
 
-
+    // Define roles permitted to access advocate listings
     const allowedRoles = ["client", "admin"];
 
+    // Enforce role-based access control
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
@@ -20,31 +24,39 @@ export const getAllAdvocates = async (req, res, next) => {
       });
     }
 
-    const advocates = await User.find({ role: "advocate", verificationStatus: "approved", })
+    // Fetch approved advocates with limited fields
+    const advocates = await User.find({
+      role: "advocate",
+      verificationStatus: "approved",
+    })
       .select("_id name email role verificationStatus lastLoginAt createdAt")
       .sort({ createdAt: -1 });
 
+    // Respond with advocate list
     res.status(200).json({
       success: true,
       count: advocates.length,
       data: advocates,
     });
   } catch (error) {
+    // Forward errors to the global error handler
     next(error);
   }
 };
 
-
-
 /**
- * Fetch users with role = clients.
+ * Get All Clients Controller
  *
- * Intended for populating selection lists
- * (e.g., dropdowns for assigning cases, appointments, juniors).
- * Returns limited, non-sensitive user fields only.
+ * Retrieves all users with the client role.
+ * Intended for internal selection lists such as
+ * appointment scheduling or case creation.
+ *
+ * Access is restricted to advocates and administrators.
+ * Only non-sensitive user fields are returned.
  */
 export const getAllClients = async (req, res, next) => {
   try {
+    // Ensure request is authenticated
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -52,40 +64,48 @@ export const getAllClients = async (req, res, next) => {
       });
     }
 
+    // Define roles permitted to access client listings
     const allowedRoles = ["advocate", "admin"];
 
+    // Enforce role-based access control
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
+
+    // Fetch clients with limited fields
     const clients = await User.find({ role: "client" })
       .select(
         "_id name email role verificationStatus lastLoginAt createdAt"
       )
       .sort({ createdAt: -1 });
 
+    // Respond with client list
     res.status(200).json({
       success: true,
       count: clients.length,
       data: clients,
     });
   } catch (error) {
+    // Forward errors to the global error handler
     next(error);
   }
 };
 
-
 /**
- * Fetch users with role = junior_advocate.
+ * Get All Junior Advocates Controller
  *
- * Intended for populating selection lists
- * (e.g., dropdowns for assigning cases, appointments, juniors).
- * Returns limited, non-sensitive user fields only.
+ * Retrieves all approved junior advocates.
+ * Intended for assigning juniors to cases or advocates.
+ *
+ * Access is restricted to advocates and administrators.
+ * Only non-sensitive user fields are returned.
  */
 export const getAllJuniors = async (req, res, next) => {
   try {
+    // Ensure request is authenticated
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -93,26 +113,35 @@ export const getAllJuniors = async (req, res, next) => {
       });
     }
 
+    // Define roles permitted to access junior advocate listings
     const allowedRoles = ["advocate", "admin"];
 
+    // Enforce role-based access control
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
-    const juniors = await User.find({ role: "junior_advocate", verificationStatus: "approved", })
+
+    // Fetch approved junior advocates with limited fields
+    const juniors = await User.find({
+      role: "junior_advocate",
+      verificationStatus: "approved",
+    })
       .select(
         "_id name email role verificationStatus lastLoginAt createdAt"
       )
       .sort({ createdAt: -1 });
 
+    // Respond with junior advocate list
     res.status(200).json({
       success: true,
       count: juniors.length,
       data: juniors,
     });
   } catch (error) {
+    // Forward errors to the global error handler
     next(error);
   }
 };

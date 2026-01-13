@@ -3,10 +3,11 @@ import Case from "../model/case.js";
 import { logAuditEvent } from "../utils/auditLogger.js";
 
 /**
- * Assign task to a junior advocate
+ * Create Task Controller
  *
- * Accessible to Advocate role only
- * Creates a task linked to a case and assigns it to a junior advocate
+ * Assigns a task to a junior advocate.
+ * Tasks are always linked to a case and can only be
+ * created by the advocate who owns the case.
  */
 export const createTask = async (req, res, next) => {
     try {
@@ -20,7 +21,7 @@ export const createTask = async (req, res, next) => {
             dueDate
         } = req.body;
 
-        // Validate required fields
+        // Validate presence of mandatory fields
         if (!title || !caseId || !assignedTo) {
             const err = new Error("Missing required fields");
             err.statusCode = 400;
@@ -35,13 +36,14 @@ export const createTask = async (req, res, next) => {
             return next(err);
         }
 
-        // Ensure only the advocate who owns the case can assign tasks
+        // Ensure only the owning advocate can assign tasks
         if (existingCase.advocate.toString() !== req.user._id.toString()) {
             const err = new Error("Access denied");
             err.statusCode = 403;
             return next(err);
         }
 
+        // Prevent task assignment on closed cases
         if (existingCase.status === "closed") {
             const err = new Error(
                 "Case is completed. No further changes are allowed."
@@ -50,13 +52,13 @@ export const createTask = async (req, res, next) => {
             return next(err);
         }
 
-        // Auto-transition: OPEN → IN_PROGRESS
+        // Automatically move case from OPEN to IN_PROGRESS on first task creation
         if (existingCase.status === "open") {
             existingCase.status = "in_progress";
             await existingCase.save();
         }
 
-        // Create task record
+        // Create the task record
         const task = await Task.create({
             title,
             description,
@@ -67,15 +69,16 @@ export const createTask = async (req, res, next) => {
             dueDate
         });
 
+        // Ensure the junior advocate is registered against the case
         await Case.findByIdAndUpdate(
             caseId,
             {
-                $addToSet: { assignedJuniors: assignedTo }, // prevents duplicates
+                $addToSet: { assignedJuniors: assignedTo }, // prevents duplicate assignments
             },
             { new: true }
         );
 
-        // Send confirmation response
+        // Respond with task creation confirmation
         res.status(201).json({
             success: true,
             message: "Task assigned successfully",
@@ -89,16 +92,19 @@ export const createTask = async (req, res, next) => {
 };
 
 /**
- * Get tasks for a specific case
+ * Get Tasks By Case Controller
+ *
+ * Retrieves all tasks for a given case.
  *
  * Accessible to:
- * - Advocate who owns the case
+ * - The advocate who owns the case
  * - Junior advocates assigned to the case
  */
 export const getTasksByCase = async (req, res, next) => {
     try {
         const { caseId } = req.params;
 
+        // Verify that the case exists
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             const err = new Error("Case not found");
@@ -108,57 +114,51 @@ export const getTasksByCase = async (req, res, next) => {
 
         const userId = req.user._id.toString();
 
+        // Check if requester is the owning advocate
         const isAdvocate =
             existingCase.advocate.toString() === userId;
 
+        // Check if requester is an assigned junior advocate
         const isJunior =
             existingCase.assignedJuniors.some(
                 (j) => j.toString() === userId
             );
 
+        // Enforce access control
         if (!isAdvocate && !isJunior) {
             const err = new Error("Access denied");
             err.statusCode = 403;
             return next(err);
         }
 
+        // Fetch tasks linked to the case
         const tasks = await Task.find({ case: caseId })
             .populate("assignedTo", "name email")
             .sort({ createdAt: -1 });
 
+        // Respond with task list
         res.status(200).json({
             success: true,
             count: tasks.length,
             data: tasks
         });
     } catch (error) {
+        // Forward unexpected errors
         next(error);
     }
 };
 
-
-
 /**
- * Update task status
+ * Update Task Status Controller
  *
- * Accessible to Junior Advocate role only
- * Allows assigned junior advocate to update task progress
+ * Allows an assigned junior advocate to update
+ * the progress status of a task.
  */
 export const updateTaskStatus = async (req, res, next) => {
     try {
-        // Extract task ID and new status
+        // Extract task identifier and new status
         const { taskId } = req.params;
         const { status } = req.body;
-
-        const existingCase = await Case.findById(task.case);
-
-        if (existingCase.status === "completed") {
-            const err = new Error(
-                "Case is completed. Tasks cannot be modified."
-            );
-            err.statusCode = 403;
-            return next(err);
-        }
 
         // Validate task status value
         if (!["pending", "in_progress", "completed"].includes(status)) {
@@ -167,14 +167,13 @@ export const updateTaskStatus = async (req, res, next) => {
             return next(err);
         }
 
-        // Fetch task by ID
+        // Fetch task record
         const task = await Task.findById(taskId);
         if (!task) {
             const err = new Error("Task not found");
             err.statusCode = 404;
             return next(err);
         }
-
 
         // Ensure only the assigned junior advocate can update the task
         if (task.assignedTo.toString() !== req.user._id.toString()) {
@@ -183,17 +182,30 @@ export const updateTaskStatus = async (req, res, next) => {
             return next(err);
         }
 
-        // Update task status and completion timestamp if applicable
+        // Update task status
         task.status = status;
 
+        // Record completion timestamp if task is completed
         if (status === "completed") {
             task.completedAt = new Date();
         }
 
-        // Persist changes
+        // Fetch associated case to validate case state
+        const existingCase = await Case.findById(task.case);
+
+        // Prevent task updates once the case is completed
+        if (existingCase.status === "completed") {
+            const err = new Error(
+                "Case is completed. Tasks cannot be modified."
+            );
+            err.statusCode = 403;
+            return next(err);
+        }
+
+        // Persist task changes
         await task.save();
 
-
+        // Log task completion event for audit trail
         await logAuditEvent({
             action: "TASK_COMPLETED",
             entityType: "Task",
@@ -207,9 +219,7 @@ export const updateTaskStatus = async (req, res, next) => {
             },
         });
 
-
-
-        // Send confirmation response
+        // Respond with updated task details
         res.status(200).json({
             success: true,
             message: "Task status updated",
@@ -221,4 +231,3 @@ export const updateTaskStatus = async (req, res, next) => {
         next(error);
     }
 };
-

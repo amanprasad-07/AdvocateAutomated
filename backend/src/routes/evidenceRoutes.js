@@ -9,33 +9,36 @@ import upload from "../config/multer.js";
 const evidenceRouter = express.Router();
 
 /**
- * Evidence routes
+ * Evidence Routes
  *
- * Handles uploading and viewing of evidence
- * with strict role-based access control.
+ * Defines endpoints for uploading and retrieving
+ * case-related evidence with role-based access control.
  */
 
 /**
  * POST /
  *
- * Upload evidence metadata.
- * Accessible to advocates and junior advocates only.
+ * Uploads evidence for a case.
+ * Accepts multipart form data with a single file field.
+ *
+ * Access:
+ * - Advocates
+ * - Junior advocates
  */
 evidenceRouter.post(
     "/",
     protect,
     requireRole("advocate", "junior_advocate"),
-    upload.single("file"),   // 🔑 THIS IS THE KEY
+    upload.single("file"),   // Handles single file upload from multipart request
     uploadEvidence
 );
 
 /**
  * GET /
  *
- * Retrieve evidence based on user role:
- * - Advocates / junior advocates: related case evidence
- * - Clients: non-confidential evidence for their cases
- * - Admins: full audit access
+ * Retrieves evidence records based on user role:
+ * - Advocates and junior advocates: evidence related to their cases
+ * - Admins: unrestricted access for audit and oversight
  */
 evidenceRouter.get(
     "/",

@@ -10,16 +10,16 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 const caseRouter = express.Router();
 
 /**
- * Case routes
+ * Case Routes
  *
- * Handles creation, retrieval, and status updates
- * for legal cases with role-based access control.
+ * Defines endpoints for creating, retrieving,
+ * and managing legal cases with role-based access control.
  */
 
 /**
  * POST /
  *
- * Create a new case.
+ * Creates a new case from an approved appointment.
  * Accessible only to advocates.
  */
 caseRouter.post(
@@ -32,9 +32,9 @@ caseRouter.post(
 /**
  * GET /
  *
- * Retrieve cases based on user role:
- * - Advocates / junior advocates: assigned cases
- * - Clients: their own cases
+ * Retrieves cases based on user role:
+ * - Advocates and junior advocates: cases assigned to them
+ * - Clients: cases belonging to them
  */
 caseRouter.get(
     "/",
@@ -45,7 +45,7 @@ caseRouter.get(
 /**
  * PATCH /:caseId/status
  *
- * Update the status of a case.
+ * Updates the lifecycle status of a case.
  * Accessible only to the advocate assigned to the case.
  */
 caseRouter.patch(
@@ -55,6 +55,12 @@ caseRouter.patch(
     updateCaseStatus
 );
 
+/**
+ * GET /:caseId
+ *
+ * Retrieves a single case by ID
+ * with role-based access enforcement.
+ */
 caseRouter.get(
   "/:caseId",
   protect,

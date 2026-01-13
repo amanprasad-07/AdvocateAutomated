@@ -2,10 +2,10 @@ import User from "../model/user.js";
 import jwt from "jsonwebtoken";
 
 /**
- * User registration controller.
+ * User Registration Controller
  *
- * Handles creation of new user accounts with
- * role-based validation and secure credential storage.
+ * Handles new user account creation with
+ * role validation and password confirmation.
  */
 export const register = async (req, res, next) => {
     try {
@@ -20,10 +20,10 @@ export const register = async (req, res, next) => {
             role
         } = req.body;
 
-        // Normalize email input to ensure consistency
+        // Normalize email to enforce case-insensitive uniqueness
         email = email?.toLowerCase();
 
-        // Restrict role assignment to allowed public roles only
+        // Restrict role assignment to publicly allowed roles
         const allowedRoles = ["client", "advocate", "junior_advocate"];
         if (role && !allowedRoles.includes(role)) {
             const error = new Error("Invalid role");
@@ -31,8 +31,9 @@ export const register = async (req, res, next) => {
             return next(error);
         }
 
-        if(password != passwordConfirm){
-             const error = new Error("Passwords must match");
+        // Ensure password and confirmation match
+        if (password != passwordConfirm) {
+            const error = new Error("Passwords must match");
             error.statusCode = 400;
             return next(error);
         }
@@ -48,7 +49,7 @@ export const register = async (req, res, next) => {
             role
         });
 
-        // Send successful registration response
+        // Respond with minimal user details after successful registration
         res.status(201).json({
             success: true,
             message: "Registration successful",
@@ -61,15 +62,15 @@ export const register = async (req, res, next) => {
         });
 
     } catch (error) {
-        // Forward validation or database errors to error handler
+        // Forward validation or persistence errors to centralized handler
         next(error);
     }
 };
 
 /**
- * User login controller.
+ * User Login Controller
  *
- * Authenticates user credentials, issues JWT,
+ * Authenticates credentials, issues a JWT,
  * and sets a secure HTTP-only authentication cookie.
  */
 export const login = async (req, res, next) => {
@@ -77,22 +78,22 @@ export const login = async (req, res, next) => {
         // Extract login credentials from request body
         let { email, password } = req.body;
 
-        // Normalize email input
+        // Normalize email input for consistent lookup
         email = email?.toLowerCase();
 
-        // Basic credential presence validation
+        // Validate presence of required credentials
         if (!email || !password) {
             const error = new Error("Invalid credentials");
             error.statusCode = 400;
             return next(error);
         }
 
-        // Ensure JWT secret is properly configured
+        // Ensure JWT secret is configured before token generation
         if (!process.env.JWT_SECRET) {
             throw new Error("JWT_SECRET is not configured");
         }
 
-        // Fetch user and explicitly include password field
+        // Retrieve user record and explicitly include password hash
         const user = await User.findOne({ email }).select("+password");
         if (!user) {
             const error = new Error("Invalid credentials");
@@ -107,7 +108,7 @@ export const login = async (req, res, next) => {
             return next(error);
         }
 
-        // Validate provided password against stored hash
+        // Compare provided password with stored hash
         const passwordMatch = await user.correctPassword(
             password,
             user.password
@@ -119,14 +120,14 @@ export const login = async (req, res, next) => {
             return next(error);
         }
 
-        // Generate JSON Web Token with user identity and role
+        // Generate JWT containing user identity and role
         const token = jwt.sign(
             { id: user._id, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: "1d" }
         );
 
-        // Set authentication token as HTTP-only cookie
+        // Store JWT in an HTTP-only cookie to mitigate XSS risks
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -134,11 +135,11 @@ export const login = async (req, res, next) => {
             maxAge: 24 * 60 * 60 * 1000
         });
 
-        // Update last login timestamp without triggering validation
+        // Update last login timestamp without triggering full validation
         user.lastLoginAt = new Date();
         await user.save({ validateBeforeSave: false });
 
-        // Send login success response
+        // Respond with authenticated user details
         res.status(200).json({
             success: true,
             message: "Login successful",
@@ -158,7 +159,13 @@ export const login = async (req, res, next) => {
     }
 };
 
+/**
+ * User Logout Controller
+ *
+ * Clears the authentication cookie to terminate the session.
+ */
 export const logout = (req, res) => {
+    // Overwrite token cookie with an expired value
     res.cookie("token", "", {
         httpOnly: true,
         expires: new Date(0),
@@ -170,6 +177,12 @@ export const logout = (req, res) => {
     });
 };
 
+/**
+ * Get Current User Controller
+ *
+ * Returns the authenticated user's data
+ * as attached by authentication middleware.
+ */
 export const me = async (req, res, next) => {
     try {
         res.status(200).json({
@@ -179,4 +192,4 @@ export const me = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-}
+};

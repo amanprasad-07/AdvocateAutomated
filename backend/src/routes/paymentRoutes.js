@@ -1,6 +1,5 @@
 import express from "express";
 import {
-    createManualPayment,
     createRazorpayOrder,
     verifyRazorpayPayment,
     getPayments,
@@ -13,52 +12,37 @@ import { protect, requireRole } from "../middleware/authMiddleware.js";
 const paymentRouter = express.Router();
 
 /**
- * Payment routes
+ * Payment Routes
  *
- * Handles manual payments, Razorpay integration,
- * payment retrieval, and status updates with role-based access control.
+ * Defines endpoints for handling payment creation,
+ * verification, retrieval, and management with
+ * strict role-based access control.
  */
-
-/* ---------- MANUAL / OFFLINE PAYMENTS ---------- */
-
-/**
- * POST /manual
- *
- * Record a manual or offline payment.
- * Accessible only to advocates.
- */
-paymentRouter.post(
-    "/manual",
-    protect,
-    requireRole("advocate"),
-    createManualPayment
-);
-
-/* ---------- RAZORPAY PAYMENTS ---------- */
 
 /**
  * POST /create-order
  *
- * Create a Razorpay order to initiate online payment.
- * Accessible only to advocates.
+ * Creates a Razorpay order to initiate an online payment.
+ * Accessible to advocates and clients.
  */
 paymentRouter.post(
     "/create-order",
     protect,
-    requireRole("advocate","client"),
+    requireRole("advocate", "client"),
     createRazorpayOrder
 );
 
 /**
  * POST /verify
  *
- * Verify Razorpay payment signature and store payment record.
- * Accessible only to advocates.
+ * Verifies Razorpay payment signature and finalizes
+ * the corresponding payment record.
+ * Accessible to advocates and clients.
  */
 paymentRouter.post(
     "/verify",
     protect,
-    requireRole("advocate","client"),
+    requireRole("advocate", "client"),
     verifyRazorpayPayment
 );
 
@@ -67,23 +51,22 @@ paymentRouter.post(
 /**
  * GET /
  *
- * Retrieve payments based on user role:
+ * Retrieves payment records based on user role:
  * - Advocates: payments they received
  * - Clients: payments they made
- * - Junior advocates: payments for assigned cases
  * - Admins: full audit access
  */
 paymentRouter.get(
     "/",
     protect,
-    requireRole("advocate", "client", "admin", "junior_advocate"),
+    requireRole("advocate", "client", "admin"),
     getPayments
 );
 
 /**
  * PATCH /:paymentId/status
  *
- * Update the status of a payment.
+ * Updates the status of an existing payment.
  * Accessible only to the advocate who received the payment.
  */
 paymentRouter.patch(
@@ -93,6 +76,12 @@ paymentRouter.patch(
     updatePaymentStatus
 );
 
+/**
+ * POST /bill
+ *
+ * Creates a pending payment request (bill) for a client.
+ * Accessible only to advocates.
+ */
 paymentRouter.post(
     "/bill",
     protect,
@@ -100,6 +89,12 @@ paymentRouter.post(
     createBill
 );
 
+/**
+ * DELETE /:paymentId
+ *
+ * Deletes a pending payment request.
+ * Accessible only to the advocate who created the bill.
+ */
 paymentRouter.delete(
     "/:paymentId",
     protect,

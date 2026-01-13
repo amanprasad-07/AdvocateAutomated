@@ -3,14 +3,15 @@ import Case from "../model/case.js";
 import { logAuditEvent } from "../utils/auditLogger.js";
 import AuditLog from "../model/auditLog.js";
 
-
 /**
- * Admin dashboard statistics
+ * Get Admin Dashboard Statistics
  *
- * High-level system overview (read-only)
+ * Provides a high-level, read-only overview of the system.
+ * Intended for administrative dashboards.
  */
 export const getAdminDashboardStats = async (req, res, next) => {
   try {
+    // Execute all count queries in parallel for efficiency
     const [
       pendingApprovals,
       verifiedAdvocates,
@@ -29,6 +30,7 @@ export const getAdminDashboardStats = async (req, res, next) => {
       Case.countDocuments(),
     ]);
 
+    // Return aggregated statistics
     res.status(200).json({
       success: true,
       data: {
@@ -39,52 +41,53 @@ export const getAdminDashboardStats = async (req, res, next) => {
       },
     });
   } catch (error) {
+    // Forward unexpected errors to centralized error handler
     next(error);
   }
 };
 
-
 /**
- * Fetch all advocates and junior advocates
- * whose verification status is currently pending.
+ * Get Pending Advocates Controller
  *
- * Intended for admin review dashboards.
+ * Retrieves all advocates and junior advocates
+ * whose verification is pending and has been submitted.
+ * Intended for admin review workflows.
  */
 export const getPendingAdvocates = async (req, res, next) => {
   try {
-    // Query users with advocate roles awaiting verification
+    // Query users awaiting verification review
     const pendingAdvocates = await User.find({
       role: { $in: ["advocate", "junior_advocate"] },
       verificationStatus: "pending",
       "advocateProfile.submittedAt": { $exists: true }
     })
-      // Limit returned fields to essential review information
+      // Restrict fields to essential review information
       .select("name email role createdAt advocateProfile");
 
-    // Send successful response with count and data
+    // Respond with pending advocate list
     res.status(200).json({
       success: true,
       count: pendingAdvocates.length,
       data: pendingAdvocates
     });
   } catch (error) {
-    // Forward error to centralized error-handling middleware
+    // Forward errors to centralized error-handling middleware
     next(error);
   }
 };
 
 /**
- * APPROVE advocate
+ * Approve Advocate Controller
  *
  * Marks an advocate or junior advocate as approved
- * after admin review.
+ * after successful administrative review.
  */
 export const approveAdvocate = async (req, res, next) => {
   try {
-    // Extract user ID from request parameters
+    // Extract target user ID from request parameters
     const { userId } = req.params;
 
-    // Fetch user by ID
+    // Fetch user record
     const user = await User.findById(userId);
     if (!user) {
       const error = new Error("User not found");
@@ -92,14 +95,14 @@ export const approveAdvocate = async (req, res, next) => {
       return next(error);
     }
 
-    // Ensure the user is eligible for advocate approval
+    // Ensure user has an advocate-related role
     if (!["advocate", "junior_advocate"].includes(user.role)) {
       const error = new Error("User is not an advocate");
       error.statusCode = 400;
       return next(error);
     }
 
-    // Ensure verification details were submitted
+    // Ensure verification data has been submitted
     if (!user.advocateProfile?.submittedAt) {
       const error = new Error(
         "Cannot approve advocate without submitted verification details"
@@ -108,6 +111,7 @@ export const approveAdvocate = async (req, res, next) => {
       return next(error);
     }
 
+    // Prevent duplicate verification actions
     if (user.verificationStatus !== "pending") {
       const error = new Error("Verification already processed");
       error.statusCode = 400;
@@ -120,15 +124,15 @@ export const approveAdvocate = async (req, res, next) => {
       return next(err);
     }
 
-
-    // Update verification status and audit metadata
+    // Update verification state and review metadata
     user.verificationStatus = "approved";
     user.verificationReviewedAt = new Date();
     user.verificationReviewedBy = req.user._id;
 
-    // Save changes without triggering full validation
+    // Persist changes without full validation
     await user.save({ validateBeforeSave: false });
 
+    // Record approval in audit logs
     await logAuditEvent({
       action: "ADVOCATE_APPROVED",
       entityType: "User",
@@ -142,7 +146,7 @@ export const approveAdvocate = async (req, res, next) => {
       },
     });
 
-    // Send confirmation response
+    // Respond with approval confirmation
     res.status(200).json({
       success: true,
       message: "Advocate approved",
@@ -161,17 +165,17 @@ export const approveAdvocate = async (req, res, next) => {
 };
 
 /**
- * REJECT advocate
+ * Reject Advocate Controller
  *
  * Marks an advocate or junior advocate as rejected
- * after admin review.
+ * after administrative review, with a mandatory reason.
  */
 export const rejectAdvocate = async (req, res, next) => {
   try {
-    // Extract user ID from request parameters
+    // Extract target user ID from request parameters
     const { userId } = req.params;
 
-    // Fetch user by ID
+    // Fetch user record
     const user = await User.findById(userId);
     if (!user) {
       const error = new Error("User not found");
@@ -179,37 +183,38 @@ export const rejectAdvocate = async (req, res, next) => {
       return next(error);
     }
 
-    // Ensure the user is eligible for advocate rejection
+    // Ensure user has an advocate-related role
     if (!["advocate", "junior_advocate"].includes(user.role)) {
       const error = new Error("User is not an advocate");
       error.statusCode = 400;
       return next(error);
     }
 
+    // Prevent duplicate verification actions
     if (user.verificationStatus !== "pending") {
       const error = new Error("Verification already processed");
       error.statusCode = 400;
       return next(error);
     }
 
-    // Update verification status and audit metadata
+    // Validate rejection reason
     const { reason } = req.body;
-
     if (!reason) {
       const err = new Error("Rejection reason is required");
       err.statusCode = 400;
       return next(err);
     }
 
+    // Update verification state and review metadata
     user.verificationStatus = "rejected";
     user.verificationRejectionReason = reason;
     user.verificationReviewedAt = new Date();
     user.verificationReviewedBy = req.user._id;
 
-
-    // Save changes without triggering full validation
+    // Persist changes without full validation
     await user.save({ validateBeforeSave: false });
 
+    // Record rejection in audit logs
     await logAuditEvent({
       action: "ADVOCATE_REJECTED",
       entityType: "User",
@@ -223,7 +228,7 @@ export const rejectAdvocate = async (req, res, next) => {
       },
     });
 
-    // Send confirmation response
+    // Respond with rejection confirmation
     res.status(200).json({
       success: true,
       message: "Advocate rejected",
@@ -242,12 +247,14 @@ export const rejectAdvocate = async (req, res, next) => {
 };
 
 /**
- * Fetch all approved advocates and junior advocates
+ * Get Verified Advocates Controller
  *
- * Read-only oversight for admin
+ * Returns all advocates and junior advocates
+ * whose verification status is approved.
  */
 export const getVerifiedAdvocates = async (req, res, next) => {
   try {
+    // Fetch approved advocates for administrative oversight
     const verified = await User.find({
       role: { $in: ["advocate", "junior_advocate"] },
       verificationStatus: "approved",
@@ -259,15 +266,20 @@ export const getVerifiedAdvocates = async (req, res, next) => {
       data: verified,
     });
   } catch (error) {
+    // Forward unexpected errors
     next(error);
   }
 };
 
 /**
- * Get all users (admin only)
+ * Get All Users Controller
+ *
+ * Provides a complete, read-only list of users
+ * for administrative oversight.
  */
 export const getAllUsers = async (req, res, next) => {
   try {
+    // Fetch all users with non-sensitive fields
     const users = await User.find()
       .select(
         "name email role verificationStatus isActive lastLoginAt createdAt"
@@ -280,17 +292,22 @@ export const getAllUsers = async (req, res, next) => {
       data: users,
     });
   } catch (error) {
+    // Forward unexpected errors
     next(error);
   }
 };
 
 /**
- * Toggle user active status (soft block / unblock)
+ * Toggle User Active Status Controller
+ *
+ * Soft activates or deactivates a user account.
+ * Intended for administrative moderation.
  */
 export const toggleUserActiveStatus = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
+    // Fetch target user
     const user = await User.findById(userId);
     if (!user) {
       const err = new Error("User not found");
@@ -298,16 +315,18 @@ export const toggleUserActiveStatus = async (req, res, next) => {
       return next(err);
     }
 
-    // Prevent admin from disabling themselves
+    // Prevent administrators from disabling their own account
     if (user._id.toString() === req.user._id.toString()) {
       const err = new Error("You cannot deactivate your own account");
       err.statusCode = 400;
       return next(err);
     }
 
+    // Toggle active state
     user.isActive = !user.isActive;
     await user.save({ validateBeforeSave: false });
 
+    // Respond with updated user state
     res.status(200).json({
       success: true,
       message: `User ${user.isActive ? "activated" : "deactivated"}`,
@@ -318,16 +337,16 @@ export const toggleUserActiveStatus = async (req, res, next) => {
       },
     });
   } catch (error) {
+    // Forward unexpected errors
     next(error);
   }
 };
 
 /**
- * Get all cases (admin read-only)
+ * Get All Cases for Admin Controller
  *
- * Filters:
- * - advocate (optional)
- * - status (optional)
+ * Returns all cases in a read-only mode.
+ * Supports optional filtering by advocate or status.
  */
 export const getAllCasesForAdmin = async (req, res, next) => {
   try {
@@ -335,14 +354,17 @@ export const getAllCasesForAdmin = async (req, res, next) => {
 
     let filter = {};
 
+    // Apply optional advocate filter
     if (advocate) {
       filter.advocate = advocate;
     }
 
+    // Apply optional status filter
     if (status) {
       filter.status = status;
     }
 
+    // Fetch cases with related user details
     const cases = await Case.find(filter)
       .populate("client", "name email")
       .populate("advocate", "name email")
@@ -355,19 +377,24 @@ export const getAllCasesForAdmin = async (req, res, next) => {
       data: cases,
     });
   } catch (error) {
+    // Forward unexpected errors
     next(error);
   }
 };
 
 /**
- * Get audit logs (admin only)
+ * Get Audit Logs Controller
+ *
+ * Provides recent audit trail entries
+ * for administrative monitoring and review.
  */
 export const getAuditLogs = async (req, res, next) => {
   try {
+    // Fetch recent audit logs with safety limit
     const logs = await AuditLog.find()
       .populate("performedBy", "name email role")
       .sort({ createdAt: -1 })
-      .limit(200); // safety cap
+      .limit(200);
 
     res.status(200).json({
       success: true,
@@ -375,6 +402,7 @@ export const getAuditLogs = async (req, res, next) => {
       data: logs,
     });
   } catch (error) {
+    // Forward unexpected errors
     next(error);
   }
 };
