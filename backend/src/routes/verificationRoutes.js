@@ -1,6 +1,6 @@
 import express from "express";
 import { protect, requireRole } from "../middleware/authMiddleware.js";
-import { submitAdvocateProfile } from "../controller/Credentials.js";
+import { submitAdvocateProfile } from "../controller/credentials.js";
 
 const verificationRouter = express.Router();
 
