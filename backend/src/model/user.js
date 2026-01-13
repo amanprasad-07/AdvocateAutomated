@@ -113,7 +113,6 @@ const userSchema = new mongoose.Schema(
             enrollmentNumber: { type: String, trim: true },
             barCouncil: { type: String, trim: true },
             experienceYears: Number,
-            documents: [String],
             submittedAt: Date
         },
 
