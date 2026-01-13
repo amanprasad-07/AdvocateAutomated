@@ -1,31 +1,29 @@
-/**
- * Centralized error-handling middleware for Express.
- *
- * This middleware captures errors thrown from controllers,
- * assigns appropriate HTTP status codes, and sends
- * a consistent JSON response to the client.
- *
- * It must be registered AFTER all routes and other middleware
- * to ensure it catches propagated errors correctly.
- */
-
 export const errorHandler = (error, req, res, next) => {
-    // Determine HTTP status code
-    // Falls back to 500 (Internal Server Error) if not explicitly defined
-    const statusCode = error?.statusCode || 500;
+    let statusCode = error.statusCode || 500;
+    let message = error.message || "Something went wrong. Please try again later";
 
-    // Determine error message
-    // Uses the custom error message if available, otherwise a generic fallback
-    const message = error?.message || "Something went wrong. Please try again later";
+    // Mongoose validation errors
+    if (error.name === "ValidationError") {
+        statusCode = 400;
 
-    // Log full error stack trace in development/debug environments
-    // Helps with debugging without exposing sensitive details to the client
-    console.error("Error:", error?.stack || message);
-    
-    // Send standardized JSON error response
-    // Ensures consistent error format across the entire API
+        // Extract clean validation messages only
+        message = Object.values(error.errors)
+            .map(err => err.message)
+            .join(". ");
+    }
+
+    // MongoDB duplicate key error (email already exists, etc.)
+    if (error.code === 11000) {
+        statusCode = 409;
+        const field = Object.keys(error.keyValue)[0];
+        message = `${field} already exists`;
+    }
+
+    // Log full error only on server
+    console.error("Error:", error.stack || error);
+
     res.status(statusCode).json({
         success: false,
-        message,
+        message
     });
-}
+};

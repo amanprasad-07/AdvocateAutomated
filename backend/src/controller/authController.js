@@ -31,6 +31,12 @@ export const register = async (req, res, next) => {
             return next(error);
         }
 
+        if(password != passwordConfirm){
+             const error = new Error("Passwords must match");
+            error.statusCode = 400;
+            return next(error);
+        }
+
         // Create new user record
         const user = await User.create({
             name,
