@@ -108,12 +108,15 @@ export const uploadEvidence = async (req, res, next) => {
                     access_mode: "public",
                     use_filename: true,
                     unique_filename: true,
+                    timeout: 60000,            // ⬅ critical
+                    chunk_size: 6000000,       // ⬅ critical (6 MB chunks)
                 },
                 (error, result) => {
                     if (error) return reject(error);
                     resolve(result);
                 }
             ).end(req.file.buffer);
+
         });
 
         // Persist evidence metadata in the database
