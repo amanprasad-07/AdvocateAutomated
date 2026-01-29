@@ -18,6 +18,8 @@ import clientRouter from './routes/clientRoutes.js';
 import juniorRouter from './routes/juniorRoutes.js';
 import getUsersRouter from './routes/getUsersRoutes.js';
 import verificationRouter from './routes/verificationRoutes.js';
+import aiRouter from './routes/aiRoutes.js';
+import invoiceRouter from './routes/invoiceRoutes.js';
 
 /**
  * Application Entry Point
@@ -75,6 +77,8 @@ app.use("/api/evidence", evidenceRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/users", getUsersRouter);
 app.use("/api/verification", verificationRouter);
+app.use("/api/ai", aiRouter);
+app.use("/api/invoices", invoiceRouter);
 
 /* -------------------------------------------------------------------------- */
 /*                             Static File Serving                              */

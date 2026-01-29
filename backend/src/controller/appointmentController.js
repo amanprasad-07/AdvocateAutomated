@@ -1,85 +1,160 @@
 import Appointment from "../model/appointment.js";
 import User from "../model/user.js";
 
-/**
- * Create Appointment Controller
- *
- * Allows a client to request an appointment with an advocate.
- * Newly created appointments default to the "requested" status.
- */
 export const createAppointment = async (req, res, next) => {
-    try {
-        // Extract appointment request details
-        const { advocateId, date, timeSlot, purpose } = req.body;
+  try {
+    const {
+      advocateId,
+      date,
+      timeSlot,
+      purpose,
+      aiAnalysis
+    } = req.body;
 
-        // Validate required appointment fields
-        if (!advocateId || !date || !timeSlot) {
-            const err = new Error("Advocate, date, and time slot are required");
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Ensure the selected user is a valid, approved advocate
-        const advocate = await User.findById(advocateId);
-        if (
-            !advocate ||
-            advocate.role !== "advocate" ||
-            advocate.verificationStatus !== "approved"
-        ) {
-            const err = new Error("Invalid advocate");
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Normalize and validate appointment date
-        const appointmentDate = new Date(date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // Prevent booking appointments in the past
-        if (appointmentDate < today) {
-            const err = new Error("Appointment date cannot be in the past");
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Prevent double booking for the same advocate, date, and time slot
-        const existingAppointment = await Appointment.findOne({
-            advocate: advocateId,
-            date,
-            timeSlot,
-            status: { $in: ["requested", "approved"] }
-        });
-
-        if (existingAppointment) {
-            const err = new Error(
-                "This time slot is already booked for the selected advocate"
-            );
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Create appointment record
-        const appointment = await Appointment.create({
-            client: req.user._id,
-            advocate: advocateId,
-            date,
-            timeSlot,
-            purpose
-        });
-
-        // Respond with appointment creation confirmation
-        res.status(201).json({
-            success: true,
-            message: "Appointment requested successfully",
-            data: appointment
-        });
-
-    } catch (error) {
-        // Forward unexpected errors to centralized error handler
-        next(error);
+    /**
+     * -----------------------------------
+     * AI ANALYSIS IS MANDATORY
+     * -----------------------------------
+     */
+    if (
+      !aiAnalysis ||
+      !aiAnalysis.input ||
+      !aiAnalysis.output ||
+      !aiAnalysis.meta
+    ) {
+      const err = new Error(
+        "AI case analysis is required before booking an appointment"
+      );
+      err.statusCode = 400;
+      return next(err);
     }
+
+    const {
+      input,
+      output,
+      meta
+    } = aiAnalysis;
+
+    // Validate AI input fields
+    if (
+      !input.description ||
+      !input.category ||
+      !input.urgency ||
+      !input.hasDocuments ||
+      !input.location
+    ) {
+      const err = new Error("Incomplete AI input data");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    // Validate AI output fields
+    if (
+      !output.caseType ||
+      !output.urgency ||
+      !output.evidenceReadiness ||
+      !output.recommendedSpecialization ||
+      !Array.isArray(output.nextSteps)
+    ) {
+      const err = new Error("Incomplete AI output data");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    // Validate appointment basics
+    if (!advocateId || !date || !timeSlot) {
+      const err = new Error("Advocate, date, and time slot are required");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    /**
+     * -----------------------------------
+     * VALIDATE ADVOCATE
+     * -----------------------------------
+     */
+    const advocate = await User.findById(advocateId);
+
+    if (
+      !advocate ||
+      advocate.role !== "advocate" ||
+      advocate.verificationStatus !== "approved"
+    ) {
+      const err = new Error("Invalid advocate");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    /**
+     * -----------------------------------
+     * DATE VALIDATION
+     * -----------------------------------
+     */
+    const appointmentDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (appointmentDate < today) {
+      const err = new Error("Appointment date cannot be in the past");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    /**
+     * -----------------------------------
+     * PREVENT DOUBLE BOOKING
+     * -----------------------------------
+     */
+    const existingAppointment = await Appointment.findOne({
+      advocate: advocateId,
+      date,
+      timeSlot,
+      status: { $in: ["requested", "approved"] },
+    });
+
+    if (existingAppointment) {
+      const err = new Error(
+        "This time slot is already booked for the selected advocate"
+      );
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    /**
+     * -----------------------------------
+     * CREATE APPOINTMENT WITH AI CONTEXT
+     * -----------------------------------
+     */
+    const appointment = await Appointment.create({
+      client: req.user._id,
+      advocate: advocateId,
+      date,
+      timeSlot,
+      purpose,
+
+      aiAnalysis: {
+        input,
+        output,
+        meta: {
+          provider: meta.provider,
+          model: meta.model,
+          generatedAt: meta.generatedAt || new Date(),
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Appointment requested successfully",
+      data: appointment,
+    });
+
+  } catch (error) {
+    next(error);
+  }
 };
+
+
 
 /**
  * Get Appointments Controller (Role-Based)
@@ -95,7 +170,7 @@ export const getAppointments = async (req, res, next) => {
         // Client can only view their own appointments
         if (req.user.role === "client") {
             filter.client = req.user._id;
-        }
+        } 
 
         // Advocate can only view their own appointments
         // Excludes appointments that already resulted in a case
@@ -121,6 +196,59 @@ export const getAppointments = async (req, res, next) => {
         // Forward unexpected errors to centralized error handler
         next(error);
     }
+};
+
+/**
+ * Get Single Appointment by ID
+ *
+ * Used by advocates during case creation
+ * to fetch full appointment + AI context.
+ */
+export const getAppointmentById = async (req, res, next) => {
+  try {
+    const { appointmentId } = req.params;
+
+    const appointment = await Appointment.findById(appointmentId)
+      .populate("client", "name email")
+      .populate("advocate", "name email");
+
+    if (!appointment) {
+      const err = new Error("Appointment not found");
+      err.statusCode = 404;
+      return next(err);
+    }
+
+    /**
+     * Access control:
+     * - Client can view only their appointment
+     * - Advocate can view only assigned appointments
+     * - Admin can view all
+     */
+    if (
+      req.user.role === "client" &&
+      appointment.client._id.toString() !== req.user._id.toString()
+    ) {
+      const err = new Error("Access denied");
+      err.statusCode = 403;
+      return next(err);
+    }
+
+    if (
+      req.user.role === "advocate" &&
+      appointment.advocate._id.toString() !== req.user._id.toString()
+    ) {
+      const err = new Error("Access denied");
+      err.statusCode = 403;
+      return next(err);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: appointment,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
@@ -192,3 +320,36 @@ export const updateAppointmentStatus = async (req, res, next) => {
         next(error);
     }
 };
+
+export const completeAppointment = async (req, res, next) => {
+  try {
+    const { appointmentId } = req.params;
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    if (appointment.advocate.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    if (appointment.status !== "approved") {
+      return res.status(400).json({
+        message: "Only approved appointments can be completed",
+      });
+    }
+
+    appointment.status = "completed";
+    await appointment.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment marked as completed",
+      data: appointment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

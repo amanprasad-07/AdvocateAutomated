@@ -113,33 +113,42 @@ export const updatePaymentStatus = async (req, res, next) => {
  */
 export const createRazorpayOrder = async (req, res, next) => {
     try {
-        const { amount } = req.body;
+        const { paymentId } = req.body;
 
-        // Validate payment amount
-        if (!amount) {
-            const err = new Error("Amount is required");
+        if (!paymentId) {
+            const err = new Error("Payment ID is required");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Create Razorpay order (convert INR to paise)
+        const payment = await Payment.findById(paymentId);
+        if (!payment) {
+            const err = new Error("Payment not found");
+            err.statusCode = 404;
+            return next(err);
+        }
+
+        if (payment.status !== "pending") {
+            const err = new Error("Payment is not pending");
+            err.statusCode = 400;
+            return next(err);
+        }
+
         const order = await razorpay.orders.create({
-            amount: amount * 100,
+            amount: payment.total * 100, // authoritative
             currency: "INR",
-            receipt: `receipt_${Date.now()}`,
+            receipt: payment.billNumber,
         });
 
-        // Return order details
         res.status(200).json({
             success: true,
             order,
         });
-
     } catch (error) {
-        // Forward Razorpay or server errors
         next(error);
     }
 };
+
 
 /**
  * Verify Razorpay Payment Controller
@@ -200,7 +209,7 @@ export const verifyRazorpayPayment = async (req, res, next) => {
                 entityType: "Payment",
                 entityId: payment._id,
                 performedBy: req.user._id,
-                message: `Payment of ₹${amount} completed`,
+                message: `Payment of ₹${payment.total} completed`,
                 metadata: {
                     role: req.user.role,
                     email: req.user.email,
@@ -232,16 +241,14 @@ export const verifyRazorpayPayment = async (req, res, next) => {
  */
 export const createBill = async (req, res, next) => {
     try {
-        const { caseId, amount, paymentFor } = req.body;
+        const { caseId, lineItems } = req.body;
 
-        // Validate required billing fields
-        if (!caseId || !amount || !paymentFor) {
-            const err = new Error("Missing required fields");
+        if (!caseId || !Array.isArray(lineItems) || lineItems.length === 0) {
+            const err = new Error("Case and at least one bill item are required");
             err.statusCode = 400;
             return next(err);
         }
 
-        // Ensure the referenced case exists
         const existingCase = await Case.findById(caseId);
         if (!existingCase) {
             const err = new Error("Case not found");
@@ -249,46 +256,81 @@ export const createBill = async (req, res, next) => {
             return next(err);
         }
 
-        // Prevent billing on closed cases
-        if (existingCase.status === "closed") {
-            const err = new Error(
-                "Case is completed. No further changes are allowed."
-            );
-            err.statusCode = 403;
-            return next(err);
-        }
-
-        // Restrict billing to the assigned advocate
         if (existingCase.advocate.toString() !== req.user._id.toString()) {
             const err = new Error("Access denied");
             err.statusCode = 403;
             return next(err);
         }
 
-        // Create pending payment request
+        /* ---------- GST CONFIG (INDIA) ---------- */
+        const GST_PERCENTAGE = 18;
+
+        /* ---------- Compute Line Items ---------- */
+        const computedItems = lineItems.map((item) => {
+            const quantity = Number(item.quantity);
+            const unitPrice = Number(item.unitPrice);
+
+            if (!item.title || quantity <= 0 || unitPrice < 0) {
+                throw new Error("Invalid line item data");
+            }
+
+            return {
+                title: item.title,
+                description: item.description,
+                quantity,
+                unitPrice,
+                amount: quantity * unitPrice,
+            };
+        });
+
+        const subtotal = computedItems.reduce(
+            (sum, item) => sum + item.amount,
+            0
+        );
+
+        const taxAmount = Math.round((subtotal * GST_PERCENTAGE) / 100);
+        const total = subtotal + taxAmount;
+
+        /* ---------- Generate Bill Number ---------- */
+        const billNumber = `BILL-${new Date().getFullYear()}-${Date.now()}`;
+
+        /* ---------- Create Bill ---------- */
         const payment = await Payment.create({
-            amount,
-            currency: "INR",
-            paymentFor,
+            billNumber,
+            documentType: "bill",
+
             case: caseId,
             client: existingCase.client,
             receivedBy: req.user._id,
+
+            lineItems: computedItems,
+            subtotal,
+
+            tax: {
+                percentage: GST_PERCENTAGE,
+                amount: taxAmount,
+                label: `GST @ ${GST_PERCENTAGE}%`,
+            },
+
+            total,
+            currency: "INR",
+
             paymentMethod: "razorpay",
-            status: "pending"
+            status: "pending",
         });
 
-        // Respond with created bill
         res.status(201).json({
             success: true,
-            message: "Payment request created",
-            data: payment
+            message: "Bill created successfully",
+            data: payment,
         });
-
     } catch (error) {
-        // Forward unexpected errors
         next(error);
     }
 };
+
+
+
 
 /**
  * Delete Payment Controller

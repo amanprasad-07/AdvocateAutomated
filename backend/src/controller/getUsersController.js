@@ -45,6 +45,72 @@ export const getAllAdvocates = async (req, res, next) => {
 };
 
 /**
+ * Get Advocates by Specialization
+ *
+ * Used by AI Case Assistant to recommend advocates
+ * based on inferred case specialization.
+ *
+ * Access: Clients only
+ */
+export const getAdvocatesBySpecialization = async (req, res, next) => {
+  try {
+    // Allow only clients to query recommendations
+    if (req.user.role !== "client") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    const { specialization } = req.query;
+
+    if (!specialization) {
+      return res.status(400).json({
+        success: false,
+        message: "Specialization is required",
+      });
+    }
+
+    const advocates = await User.find({
+      role: "advocate",
+      verificationStatus: "approved",
+      "advocateProfile.specialization": {
+        $in: [specialization, "Other"]
+      }
+    })
+      .select(
+        "_id name email advocateProfile.experienceYears advocateProfile.specialization"
+      )
+      .sort({ "advocateProfile.experienceYears": -1 });
+
+    const fallbackAdvocates = await User.find({
+      role: "advocate",
+      verificationStatus: "approved"
+    }).limit(5);
+
+   const matchedAdvocates = advocates.length > 0
+  ? advocates
+  : fallbackAdvocates;
+
+res.status(200).json({
+  success: true,
+  matchType: advocates.length > 0 ? "specialization_match" : "fallback",
+  recommendedSpecialization: specialization,
+  count: matchedAdvocates.length,
+  data: matchedAdvocates,
+  message:
+    advocates.length > 0
+      ? "Advocates matched based on case specialization"
+      : "No exact specialization match found. Showing available verified advocates instead",
+});
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+/**
  * Get All Clients Controller
  *
  * Retrieves all users with the client role.
@@ -145,3 +211,4 @@ export const getAllJuniors = async (req, res, next) => {
     next(error);
   }
 };
+

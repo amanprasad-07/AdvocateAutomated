@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getAdvocatesBySpecialization,
   getAllAdvocates,
   getAllClients,
   getAllJuniors
@@ -28,6 +29,13 @@ getUsersRouter.get(
   protect,
   getAllAdvocates
 );
+
+getUsersRouter.get(
+  "/advocates/by-specialization",
+  protect,
+  getAdvocatesBySpecialization
+);
+
 
 /**
  * GET /getClients

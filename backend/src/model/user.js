@@ -112,6 +112,24 @@ const userSchema = new mongoose.Schema(
         advocateProfile: {
             enrollmentNumber: { type: String, trim: true },
             barCouncil: { type: String, trim: true },
+            specialization: {
+                type: [String],
+                default: [],
+                enum: [
+                    "Civil",
+                    "Criminal",
+                    "Family",
+                    "Property",
+                    "Corporate",
+                    "Consumer Protection",
+                    "Labour",
+                    "Intellectual Property",
+                    "Tax",
+                    "Personal Injury",
+                    "Other"
+                ]
+            },
+
             experienceYears: Number,
             submittedAt: Date
         },

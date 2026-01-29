@@ -1,6 +1,8 @@
 import express from "express";
 import {
+    completeAppointment,
     createAppointment,
+    getAppointmentById,
     getAppointments,
     updateAppointmentStatus
 } from "../controller/appointmentController.js";
@@ -15,6 +17,7 @@ const appointmentRouter = express.Router();
  * and managing appointments.
  */
 
+
 /**
  * POST /
  *
@@ -26,6 +29,30 @@ appointmentRouter.post(
     protect,
     requireRole("client"),
     createAppointment
+);
+
+/**
+ * PATCH /:appointmentId/status
+ *
+ * Allows an advocate to approve or reject
+ * a requested appointment.
+ */
+appointmentRouter.patch(
+    "/:appointmentId/status",
+    protect,
+    requireRole("advocate"),
+    updateAppointmentStatus
+);
+
+/**
+ * Advocate marks consultation as completed
+ * ONLY after approval
+ */
+appointmentRouter.patch(
+  "/:appointmentId/complete",
+   protect,
+    requireRole("advocate"),
+  completeAppointment
 );
 
 /**
@@ -44,16 +71,16 @@ appointmentRouter.get(
 );
 
 /**
- * PATCH /:appointmentId/status
+ * GET /:appointmentId
  *
- * Allows an advocate to approve or reject
- * a requested appointment.
+ * Fetch a single appointment with full context.
+ * Used during case creation.
  */
-appointmentRouter.patch(
-    "/:appointmentId/status",
-    protect,
-    requireRole("advocate"),
-    updateAppointmentStatus
+appointmentRouter.get(
+  "/:appointmentId",
+  protect,
+  requireRole("client", "advocate", "admin"),
+  getAppointmentById
 );
 
 export default appointmentRouter;
