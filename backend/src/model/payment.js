@@ -1,91 +1,174 @@
 import mongoose from "mongoose";
 
 /**
- * Payment schema representing financial transactions
- * related to legal cases and services.
- * Supports multiple payment methods, status tracking,
- * and audit-friendly transaction records.
+ * Payment / Bill Schema
+ *
+ * - Acts as a bill before payment
+ * - Acts as the base record for invoice after payment
  */
 const paymentSchema = new mongoose.Schema(
-    {
-        // Monetary amount involved in the transaction
-        amount: {
-            type: Number,
-            required: true,
-            min: 0 // Prevents negative payment values
-        },
-
-        // Currency code for the payment
-        currency: {
-            type: String,
-            default: "INR"
-        },
-
-        // Description of what the payment is for
-        paymentFor: {
-            type: String,
-            required: true,
-            trim: true
-        },
-
-        /**
-         * Relationship mappings
-         */
-
-        // Case associated with this payment
-        case: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Case",
-            required: true
-        },
-
-        // Client who made the payment
-        client: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true
-        },
-
-        // Advocate or user who received the payment
-        receivedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true
-        },
-
-        /**
-         * Payment processing details
-         */
-
-        // Method used to complete the payment
-        paymentMethod: {
-            type: String,
-            enum: ["upi", "card", "cash", "bank_transfer", "razorpay", "other"],
-            required: true
-        },
-
-        // Current status of the payment transaction
-        status: {
-            type: String,
-            enum: ["pending", "paid", "failed"],
-            default: "pending"
-        },
-
-        // Gateway or internal transaction reference ID
-        transactionId: {
-            type: String
-        },
-
-        // Timestamp recorded when payment is successfully completed
-        paidAt: {
-            type: Date
-        }
+  {
+    /* ---------- Identity ---------- */
+    billNumber: {
+      type: String,
+      required: true,
+      unique: true,
     },
-    {
-        // Automatically manages createdAt and updatedAt fields
-        timestamps: true
-    }
+
+    documentType: {
+      type: String,
+      enum: ["bill", "invoice"],
+      default: "bill",
+    },
+
+    /* ---------- Line Items ---------- */
+    lineItems: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        description: {
+          type: String,
+          trim: true,
+        },
+
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+          default: 1,
+        },
+
+        unitPrice: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+
+        amount: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
+
+    /* ---------- Amount Breakdown ---------- */
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    tax: {
+      percentage: {
+        type: Number,
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
+      label: {
+        type: String,
+        default: "GST",
+      },
+    },
+
+    total: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    currency: {
+      type: String,
+      default: "INR",
+    },
+
+    /* ---------- Relationships ---------- */
+    case: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Case",
+      required: true,
+    },
+
+    client: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    receivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    /* ---------- Payment State ---------- */
+    paymentMethod: {
+      type: String,
+      enum: ["razorpay", "upi", "card", "cash", "bank_transfer"],
+      default: "razorpay",
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+    },
+
+    transactionId: String,
+    paidAt: Date,
+
+    /* ---------- Invoice (Generated After Payment) ---------- */
+    invoice: {
+      invoiceNumber: {
+        type: String,
+        unique: true,
+        sparse: true,
+      },
+
+      issuedAt: Date,
+
+      invoiceUrl: {
+        type: String,
+      },
+
+      cloudinaryPublicId: {
+  type: String,
+},
+
+
+      version: {
+        type: Number,
+        default: 1,
+      },
+
+      hash: {
+        type: String,
+      },
+
+      sellerSnapshot: {
+        name: String,
+        email: String,
+        gstNumber: String,
+        address: String,
+      },
+
+      buyerSnapshot: {
+        name: String,
+        email: String,
+        address: String,
+      },
+    },
+  },
+  {
+    timestamps: true,
+  }
 );
 
-// Export Payment model for use in billing and transaction workflows
 export default mongoose.model("Payment", paymentSchema);

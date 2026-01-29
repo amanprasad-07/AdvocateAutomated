@@ -1,5 +1,6 @@
 import Case from "../model/case.js";
 import Appointment from "../model/appointment.js";
+import User from "../model/user.js"
 
 /**
  * Create Case Controller
@@ -10,23 +11,18 @@ import Appointment from "../model/appointment.js";
  */
 export const createCase = async (req, res, next) => {
   try {
-    // Extract case creation details from request body
     const {
       appointmentId,
       title,
-      description,
-      caseType,
       assignedJuniors = []
     } = req.body;
 
-    // Validate required fields
-    if (!appointmentId || !title || !description || !caseType) {
+    if (!appointmentId || !title) {
       const err = new Error("Missing required fields");
       err.statusCode = 400;
       return next(err);
     }
 
-    // Fetch and validate appointment
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) {
       const err = new Error("Appointment not found");
@@ -34,39 +30,104 @@ export const createCase = async (req, res, next) => {
       return next(err);
     }
 
-    // Prevent duplicate case creation for the same appointment
     const existingCase = await Case.findOne({ appointment: appointmentId });
     if (existingCase) {
-      const err = new Error("A case has already been created for this appointment");
+      const err = new Error("A case already exists for this appointment");
       err.statusCode = 400;
       return next(err);
     }
 
-    // Ensure appointment is approved before case creation
-    if (appointment.status !== "approved") {
+    if (appointment.status !== "completed") {
       const err = new Error(
-        "Appointment must be approved before creating a case"
+        "Consultation must be completed before creating a case"
       );
       err.statusCode = 400;
       return next(err);
     }
 
-    // Ensure only the assigned advocate can create the case
     if (appointment.advocate.toString() !== req.user._id.toString()) {
       const err = new Error("Access denied");
       err.statusCode = 403;
       return next(err);
     }
 
-    // Generate a unique case reference number
+    /**
+     * 🔒 AI DATA IS THE SOURCE OF TRUTH
+     */
+    const aiOutput = appointment.aiAnalysis?.output;
+
+    if (!aiOutput) {
+      const err = new Error(
+        "AI case analysis is required before creating a case"
+      );
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    const allowedSpecializations = [
+      "Civil",
+      "Criminal",
+      "Family",
+      "Property",
+      "Corporate",
+      "Consumer Protection",
+      "Labour",
+      "Intellectual Property",
+      "Tax",
+      "Personal Injury",
+      "Other"
+    ];
+
+    const specialization = allowedSpecializations.includes(
+      aiOutput.recommendedSpecialization
+    )
+      ? aiOutput.recommendedSpecialization
+      : "Other";
+
     const caseNumber = `CASE-${Date.now()}`;
 
-    // Create the new case record
+    const derivedDescription = `
+AI Case Summary
+---------------
+Case Type: ${aiOutput.caseType}
+Urgency: ${aiOutput.urgency}
+Evidence Readiness: ${aiOutput.evidenceReadiness}
+
+Suggested Next Steps:
+${aiOutput.nextSteps.join("\n")}
+
+--------------------------------
+Advocate Notes:
+`;
+
+// Validate assigned junior advocates
+if (assignedJuniors.length > 0) {
+  const validJuniors = await User.find({
+    _id: { $in: assignedJuniors },
+    role: "junior_advocate",
+    verificationStatus: "approved"
+  }).select("_id");
+
+  if (validJuniors.length !== assignedJuniors.length) {
+    const err = new Error("One or more assigned juniors are invalid");
+    err.statusCode = 400;
+    return next(err);
+  }
+}
+
+
     const newCase = await Case.create({
       caseNumber,
       title,
-      description,
-      caseType,
+      description: derivedDescription,
+      specialization,
+
+      aiAnalysis: {
+        urgency: aiOutput.urgency,
+        evidenceReadiness: aiOutput.evidenceReadiness,
+        suggestedNextSteps: aiOutput.nextSteps,
+      },
+
       client: appointment.client,
       advocate: appointment.advocate,
       appointment: appointment._id,
@@ -74,23 +135,20 @@ export const createCase = async (req, res, next) => {
       createdBy: req.user._id,
     });
 
-    // Mark appointment as completed and linked to the created case
-    appointment.status = "completed";
     appointment.caseCreated = true;
     appointment.linkedCase = newCase._id;
     await appointment.save({ validateBeforeSave: false });
 
-    // Respond with case creation confirmation
     res.status(201).json({
       success: true,
       message: "Case created successfully",
       data: newCase
     });
   } catch (error) {
-    // Forward unexpected errors to centralized error handler
     next(error);
   }
 };
+
 
 /**
  * Get Cases Controller (Role-Based)
@@ -234,7 +292,9 @@ export const getCaseById = async (req, res, next) => {
     const caseData = await Case.findById(caseId)
       .populate("client", "name email")
       .populate("advocate", "name email")
-      .populate("assignedJuniors", "name email");
+      .populate("assignedJuniors", "name email")
+      .populate("appointment");
+
 
     if (!caseData) {
       const err = new Error("Case not found");
@@ -273,3 +333,5 @@ export const getCaseById = async (req, res, next) => {
     next(error);
   }
 };
+
+
