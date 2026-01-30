@@ -1,5 +1,6 @@
 import Appointment from "../model/appointment.js";
 import User from "../model/user.js";
+import { normalizeAiOutput } from "../utils/normalize-ai-output.js";
 
 export const createAppointment = async (req, res, next) => {
   try {
@@ -60,6 +61,11 @@ export const createAppointment = async (req, res, next) => {
       err.statusCode = 400;
       return next(err);
     }
+
+    // -----------------------------------
+    // NORMALIZE AI OUTPUT (CRITICAL)
+    // -----------------------------------
+    const normalizedOutput = normalizeAiOutput(output);
 
     // Validate appointment basics
     if (!advocateId || !date || !timeSlot) {
@@ -134,13 +140,14 @@ export const createAppointment = async (req, res, next) => {
 
       aiAnalysis: {
         input,
-        output,
+        output: normalizedOutput, 
         meta: {
           provider: meta.provider,
           model: meta.model,
           generatedAt: meta.generatedAt || new Date(),
         },
       },
+
     });
 
     res.status(201).json({
@@ -164,38 +171,38 @@ export const createAppointment = async (req, res, next) => {
  * - Admin: retrieves all appointments
  */
 export const getAppointments = async (req, res, next) => {
-    try {
-        let filter = {};
+  try {
+    let filter = {};
 
-        // Client can only view their own appointments
-        if (req.user.role === "client") {
-            filter.client = req.user._id;
-        } 
-
-        // Advocate can only view their own appointments
-        // Excludes appointments that already resulted in a case
-        if (req.user.role === "advocate") {
-            filter.advocate = req.user._id;
-            filter.caseCreated = { $ne: true };
-        }
-
-        // Fetch appointments with related user details
-        const appointments = await Appointment.find(filter)
-            .populate("client", "name email")
-            .populate("advocate", "name email")
-            .sort({ date: 1 });
-
-        // Respond with appointment list
-        res.status(200).json({
-            success: true,
-            count: appointments.length,
-            data: appointments
-        });
-
-    } catch (error) {
-        // Forward unexpected errors to centralized error handler
-        next(error);
+    // Client can only view their own appointments
+    if (req.user.role === "client") {
+      filter.client = req.user._id;
     }
+
+    // Advocate can only view their own appointments
+    // Excludes appointments that already resulted in a case
+    if (req.user.role === "advocate") {
+      filter.advocate = req.user._id;
+      filter.caseCreated = { $ne: true };
+    }
+
+    // Fetch appointments with related user details
+    const appointments = await Appointment.find(filter)
+      .populate("client", "name email")
+      .populate("advocate", "name email")
+      .sort({ date: 1 });
+
+    // Respond with appointment list
+    res.status(200).json({
+      success: true,
+      count: appointments.length,
+      data: appointments
+    });
+
+  } catch (error) {
+    // Forward unexpected errors to centralized error handler
+    next(error);
+  }
 };
 
 /**
@@ -258,67 +265,67 @@ export const getAppointmentById = async (req, res, next) => {
  * a requested appointment.
  */
 export const updateAppointmentStatus = async (req, res, next) => {
-    try {
-        // Extract appointment identifier and desired status
-        const { appointmentId } = req.params;
-        const { status, notes } = req.body;
+  try {
+    // Extract appointment identifier and desired status
+    const { appointmentId } = req.params;
+    const { status, notes } = req.body;
 
-        // Validate allowed status transitions
-        if (!["approved", "rejected"].includes(status)) {
-            const err = new Error("Invalid appointment status");
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Fetch appointment record
-        const appointment = await Appointment.findById(appointmentId);
-        if (!appointment) {
-            const err = new Error("Appointment not found");
-            err.statusCode = 404;
-            return next(err);
-        }
-
-        // Ensure only the assigned advocate can update the appointment
-        if (appointment.advocate.toString() !== req.user._id.toString()) {
-            const err = new Error("Access denied");
-            err.statusCode = 403;
-            return next(err);
-        }
-
-        // Enforce valid workflow transitions
-        if (appointment.status !== "requested") {
-            const err = new Error(
-                `Appointment cannot be ${status} once it is ${appointment.status}`
-            );
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Rejection must include a reason
-        if (status === "rejected" && (!notes || notes.trim() === "")) {
-            const err = new Error("Rejection reason is required");
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        // Apply status update and optional notes
-        appointment.status = status;
-        if (notes) appointment.notes = notes;
-
-        // Persist appointment changes
-        await appointment.save();
-
-        // Respond with update confirmation
-        res.status(200).json({
-            success: true,
-            message: `Appointment ${status} successfully`,
-            data: appointment
-        });
-
-    } catch (error) {
-        // Forward unexpected errors to centralized error handler
-        next(error);
+    // Validate allowed status transitions
+    if (!["approved", "rejected"].includes(status)) {
+      const err = new Error("Invalid appointment status");
+      err.statusCode = 400;
+      return next(err);
     }
+
+    // Fetch appointment record
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      const err = new Error("Appointment not found");
+      err.statusCode = 404;
+      return next(err);
+    }
+
+    // Ensure only the assigned advocate can update the appointment
+    if (appointment.advocate.toString() !== req.user._id.toString()) {
+      const err = new Error("Access denied");
+      err.statusCode = 403;
+      return next(err);
+    }
+
+    // Enforce valid workflow transitions
+    if (appointment.status !== "requested") {
+      const err = new Error(
+        `Appointment cannot be ${status} once it is ${appointment.status}`
+      );
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    // Rejection must include a reason
+    if (status === "rejected" && (!notes || notes.trim() === "")) {
+      const err = new Error("Rejection reason is required");
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    // Apply status update and optional notes
+    appointment.status = status;
+    if (notes) appointment.notes = notes;
+
+    // Persist appointment changes
+    await appointment.save();
+
+    // Respond with update confirmation
+    res.status(200).json({
+      success: true,
+      message: `Appointment ${status} successfully`,
+      data: appointment
+    });
+
+  } catch (error) {
+    // Forward unexpected errors to centralized error handler
+    next(error);
+  }
 };
 
 export const completeAppointment = async (req, res, next) => {

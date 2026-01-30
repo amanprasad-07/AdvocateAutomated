@@ -52,9 +52,22 @@ export const createCase = async (req, res, next) => {
     }
 
     /**
-     * 🔒 AI DATA IS THE SOURCE OF TRUTH
+     * AI DATA IS THE SOURCE OF TRUTH
      */
-    const aiOutput = appointment.aiAnalysis?.output;
+    const rawAiOutput = appointment.aiAnalysis?.output;
+    if (!rawAiOutput) {
+      const err = new Error(
+        "AI case analysis is required before creating a case"
+      );
+      err.statusCode = 400;
+      return next(err);
+    }
+
+    // -----------------------------------
+    // NORMALIZE AI OUTPUT 
+    // -----------------------------------
+    const aiOutput = normalizeAiOutput(rawAiOutput);
+
 
     if (!aiOutput) {
       const err = new Error(
@@ -100,20 +113,20 @@ ${aiOutput.nextSteps.join("\n")}
 Advocate Notes:
 `;
 
-// Validate assigned junior advocates
-if (assignedJuniors.length > 0) {
-  const validJuniors = await User.find({
-    _id: { $in: assignedJuniors },
-    role: "junior_advocate",
-    verificationStatus: "approved"
-  }).select("_id");
+    // Validate assigned junior advocates
+    if (assignedJuniors.length > 0) {
+      const validJuniors = await User.find({
+        _id: { $in: assignedJuniors },
+        role: "junior_advocate",
+        verificationStatus: "approved"
+      }).select("_id");
 
-  if (validJuniors.length !== assignedJuniors.length) {
-    const err = new Error("One or more assigned juniors are invalid");
-    err.statusCode = 400;
-    return next(err);
-  }
-}
+      if (validJuniors.length !== assignedJuniors.length) {
+        const err = new Error("One or more assigned juniors are invalid");
+        err.statusCode = 400;
+        return next(err);
+      }
+    }
 
 
     const newCase = await Case.create({
