@@ -1,6 +1,7 @@
 import Case from "../model/case.js";
 import Appointment from "../model/appointment.js";
 import User from "../model/user.js"
+import { normalizeAiOutput } from "../utils/normalize-ai-output.js";
 
 /**
  * Create Case Controller
