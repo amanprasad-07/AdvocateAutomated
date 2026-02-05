@@ -124,7 +124,7 @@ export const downloadInvoice = async (req, res, next) => {
       "pdf", // Force the extension
       {
         resource_type: "raw",
-        type: "upload",
+        type: "authenticated",
         // We use a timestamp-based expiration to ensure validity
         expires_at: Math.floor(Date.now() / 1000) + 3600, 
       }
